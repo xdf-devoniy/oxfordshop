@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sale_id'])) {
         if ($summary['balance'] <= 0.0001) {
             $errors[] = 'This receipt is already fully settled.';
         } elseif ($amount > $summary['balance'] + 0.0001) {
-            $errors[] = 'Payment exceeds the remaining balance of ₩' . number_format($summary['balance'], 2) . '.';
+            $errors[] = "Payment exceeds the remaining balance of so'm " . number_format($summary['balance'], 2) . '.';
         }
     }
 
@@ -71,7 +71,8 @@ render_header('Receipts');
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">Sale Receipts</h3>
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <div class="max-h-[30rem] overflow-y-auto">
+                <table class="min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-xs uppercase text-slate-500">
                         <th class="pb-2">Receipt #</th>
@@ -112,9 +113,9 @@ render_header('Receipts');
                                 <td class="py-2 font-medium text-slate-800">#<?= (int)$receipt['id'] ?></td>
                                 <td class="py-2 text-slate-600"><?= htmlspecialchars($receipt['sale_date']) ?></td>
                                 <td class="py-2 text-slate-600"><?= htmlspecialchars($receipt['customer_name']) ?></td>
-                                <td class="py-2 text-slate-700">₩<?= number_format((float)$receipt['total_amount'], 2) ?></td>
-                                <td class="py-2 text-emerald-600">₩<?= number_format((float)$receipt['total_paid'], 2) ?></td>
-                                <td class="py-2 <?= $balance > 0 ? 'text-rose-600' : 'text-slate-500' ?>">₩<?= number_format($balance, 2) ?></td>
+                                <td class="py-2 text-slate-700"><?= number_format((float)$receipt['total_amount'], 2) ?> so'm</td>
+                                <td class="py-2 text-emerald-600"><?= number_format((float)$receipt['total_paid'], 2) ?> so'm</td>
+                                <td class="py-2 <?= $balance > 0 ? 'text-rose-600' : 'text-slate-500' ?>"><?= number_format($balance, 2) ?> so'm</td>
                                 <td class="py-2">
                                     <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium <?= $status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : ($status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700') ?>"><?= $status ?></span>
                                 </td>
@@ -125,7 +126,8 @@ render_header('Receipts');
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
@@ -149,12 +151,12 @@ render_header('Receipts');
                     <ul class="mt-2 space-y-1">
                         <?php foreach ($items as $item): ?>
                             <li class="flex justify-between">
-                                <span><?= htmlspecialchars($item['name']) ?> · <?= number_format((float)$item['quantity'], 2) ?> <?= htmlspecialchars($item['unit']) ?> × ₩<?= number_format((float)$item['unit_price'], 2) ?></span>
-                                <span class="font-medium">₩<?= number_format((float)$item['total'], 2) ?></span>
+                                <span><?= htmlspecialchars($item['name']) ?> · <?= number_format((float)$item['quantity'], 2) ?> <?= htmlspecialchars($item['unit']) ?> × <?= number_format((float)$item['unit_price'], 2) ?> so'm</span>
+                                <span class="font-medium"><?= number_format((float)$item['total'], 2) ?> so'm</span>
                             </li>
                         <?php endforeach; ?>
                     </ul>
-                    <p class="mt-2 text-sm font-semibold text-slate-800">Total: ₩<?= number_format((float)$sale['total_amount'], 2) ?></p>
+                    <p class="mt-2 text-sm font-semibold text-slate-800">Total: <?= number_format((float)$sale['total_amount'], 2) ?> so'm</p>
                 </div>
                 <div>
                     <h4 class="font-semibold text-slate-700">Payments</h4>
@@ -165,13 +167,13 @@ render_header('Receipts');
                             <?php foreach ($payments as $payment): ?>
                                 <li class="flex justify-between">
                                     <span><?= strtoupper($payment['payment_method']) ?> · <?= htmlspecialchars($payment['payment_date']) ?></span>
-                                    <span class="font-medium text-emerald-600">₩<?= number_format((float)$payment['amount'], 2) ?></span>
+                                    <span class="font-medium text-emerald-600"><?= number_format((float)$payment['amount'], 2) ?> so'm</span>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
                     <?php endif; ?>
-                    <p class="mt-2 text-sm text-slate-600">Paid: ₩<?= number_format($totalPaid, 2) ?></p>
-                    <p class="text-sm <?= $balance > 0 ? 'text-rose-600' : 'text-slate-500' ?>">Balance: ₩<?= number_format($balance, 2) ?></p>
+                    <p class="mt-2 text-sm text-slate-600">Paid: <?= number_format($totalPaid, 2) ?> so'm</p>
+                    <p class="text-sm <?= $balance > 0 ? 'text-rose-600' : 'text-slate-500' ?>">Balance: <?= number_format($balance, 2) ?> so'm</p>
                 </div>
             </div>
             <hr class="my-4">
@@ -195,9 +197,9 @@ render_header('Receipts');
                 <form method="post" class="space-y-3">
                     <input type="hidden" name="sale_id" value="<?= (int)$sale['id'] ?>">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700">Amount (₩)</label>
+                        <label class="block text-sm font-medium text-slate-700">Amount (so'm)</label>
                         <input type="number" step="0.01" min="0" max="<?= htmlspecialchars(number_format($balance, 2, '.', '')) ?>" name="amount" value="<?= htmlspecialchars($_POST['amount'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
-                        <p class="text-xs text-slate-500 mt-1">Remaining balance: ₩<?= number_format($balance, 2) ?></p>
+                        <p class="text-xs text-slate-500 mt-1">Remaining balance: <?= number_format($balance, 2) ?> so'm</p>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>

@@ -52,11 +52,11 @@ render_header('Dashboard');
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-5">
         <p class="text-sm text-slate-500">Revenue To Date</p>
-        <p class="text-3xl font-semibold text-emerald-600">₩<?= number_format((float)$totalRevenue, 2) ?></p>
+        <p class="text-3xl font-semibold text-emerald-600"><?= number_format((float)$totalRevenue, 2) ?> so'm</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-5">
         <p class="text-sm text-slate-500">Outstanding Debt</p>
-        <p class="text-3xl font-semibold text-rose-600">₩<?= number_format((float)$outstanding, 2) ?></p>
+        <p class="text-3xl font-semibold text-rose-600"><?= number_format((float)$outstanding, 2) ?> so'm</p>
     </div>
 </div>
 
@@ -64,7 +64,8 @@ render_header('Dashboard');
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">Recent Sales</h3>
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <div class="max-h-[22rem] overflow-y-auto">
+                <table class="min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-500 uppercase text-xs">
                         <th class="pb-2">Receipt #</th>
@@ -88,14 +89,15 @@ render_header('Dashboard');
                                 <td class="py-2 font-medium text-slate-700">#<?= (int)$sale['id'] ?></td>
                                 <td class="py-2 text-slate-600"><?= htmlspecialchars($sale['sale_date']) ?></td>
                                 <td class="py-2 text-slate-600"><?= htmlspecialchars($sale['customer']) ?></td>
-                                <td class="py-2 text-slate-800">₩<?= number_format((float)$sale['total_amount'], 2) ?></td>
-                                <td class="py-2 text-emerald-600">₩<?= number_format((float)$sale['total_paid'], 2) ?></td>
-                                <td class="py-2 <?= $balance > 0 ? 'text-rose-600' : 'text-slate-500' ?>">₩<?= number_format($balance, 2) ?></td>
+                                <td class="py-2 text-slate-800"><?= number_format((float)$sale['total_amount'], 2) ?> so'm</td>
+                                <td class="py-2 text-emerald-600"><?= number_format((float)$sale['total_paid'], 2) ?> so'm</td>
+                                <td class="py-2 <?= $balance > 0 ? 'text-rose-600' : 'text-slate-500' ?>"><?= number_format($balance, 2) ?> so'm</td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
@@ -122,15 +124,15 @@ render_header('Dashboard');
         <dl class="space-y-2 text-sm">
             <div class="flex justify-between">
                 <dt class="text-slate-500">Total purchases</dt>
-                <dd class="text-slate-700">₩<?= number_format((float)$totalPurchases, 2) ?></dd>
+                <dd class="text-slate-700"><?= number_format((float)$totalPurchases, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
                 <dt class="text-slate-500">Payments received</dt>
-                <dd class="text-emerald-600 font-medium">₩<?= number_format((float)$totalPayments, 2) ?></dd>
+                <dd class="text-emerald-600 font-medium"><?= number_format((float)$totalPayments, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
                 <dt class="text-slate-500">Outstanding balance</dt>
-                <dd class="text-rose-600 font-medium">₩<?= number_format((float)$outstanding, 2) ?></dd>
+                <dd class="text-rose-600 font-medium"><?= number_format((float)$outstanding, 2) ?> so'm</dd>
             </div>
         </dl>
     </section>

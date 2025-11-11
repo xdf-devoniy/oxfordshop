@@ -63,8 +63,8 @@ render_header('Purchases');
                                 <td class="py-2 text-slate-600"><?= htmlspecialchars($purchase['purchase_date']) ?></td>
                                 <td class="py-2 font-medium text-slate-800"><?= htmlspecialchars($purchase['product_name']) ?></td>
                                 <td class="py-2 text-slate-600"><?= number_format((float)$purchase['quantity'], 2) ?> <?= htmlspecialchars($purchase['unit']) ?></td>
-                                <td class="py-2 text-slate-600">₩<?= number_format((float)$purchase['unit_cost'], 2) ?></td>
-                                <td class="py-2 text-slate-800 font-medium">₩<?= number_format((float)$purchase['quantity'] * (float)$purchase['unit_cost'], 2) ?></td>
+                                <td class="py-2 text-slate-600"><?= number_format((float)$purchase['unit_cost'], 2) ?> so'm</td>
+                                <td class="py-2 text-slate-800 font-medium"><?= number_format((float)$purchase['quantity'] * (float)$purchase['unit_cost'], 2) ?> so'm</td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -108,7 +108,7 @@ render_header('Purchases');
                         <input type="number" step="0.01" min="0" name="quantity" value="<?= htmlspecialchars($_POST['quantity'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700">Unit cost (₩)</label>
+                        <label class="block text-sm font-medium text-slate-700">Unit cost (so'm)</label>
                         <input type="number" step="0.01" min="0" name="unit_cost" value="<?= htmlspecialchars($_POST['unit_cost'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
                     </div>
                 </div>

@@ -72,7 +72,7 @@ render_header('Debtors');
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-slate-800">Customers with Outstanding Balances</h3>
             <?php if ($walkInOutstanding > 0): ?>
-                <span class="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded-full">Walk-in debt: ₩<?= number_format($walkInOutstanding, 2) ?></span>
+                <span class="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded-full">Walk-in debt: <?= number_format($walkInOutstanding, 2) ?> so'm</span>
             <?php endif; ?>
         </div>
         <div class="overflow-x-auto">
@@ -104,12 +104,12 @@ render_header('Debtors');
                                     <div class="text-xs text-slate-400">#<?= $id ?></div>
                                 </td>
                                 <td class="py-2 text-slate-600"><?= htmlspecialchars($customer['phone'] ?? '-') ?></td>
-                                <td class="py-2 text-slate-600">₩<?= number_format((float)$customer['total_sold'], 2) ?></td>
-                                <td class="py-2 text-emerald-600">₩<?= number_format((float)$customer['total_paid'], 2) ?></td>
-                                <td class="py-2 text-rose-600 font-medium">₩<?= number_format((float)$customer['balance'], 2) ?></td>
-                                <td class="py-2 text-slate-600">₩<?= number_format($aging[$id]['0-7'] ?? 0, 2) ?></td>
-                                <td class="py-2 text-slate-600">₩<?= number_format($aging[$id]['8-30'] ?? 0, 2) ?></td>
-                                <td class="py-2 text-slate-600">₩<?= number_format($aging[$id]['30+'] ?? 0, 2) ?></td>
+                                <td class="py-2 text-slate-600"><?= number_format((float)$customer['total_sold'], 2) ?> so'm</td>
+                                <td class="py-2 text-emerald-600"><?= number_format((float)$customer['total_paid'], 2) ?> so'm</td>
+                                <td class="py-2 text-rose-600 font-medium"><?= number_format((float)$customer['balance'], 2) ?> so'm</td>
+                                <td class="py-2 text-slate-600"><?= number_format($aging[$id]['0-7'] ?? 0, 2) ?> so'm</td>
+                                <td class="py-2 text-slate-600"><?= number_format($aging[$id]['8-30'] ?? 0, 2) ?> so'm</td>
+                                <td class="py-2 text-slate-600"><?= number_format($aging[$id]['30+'] ?? 0, 2) ?> so'm</td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>

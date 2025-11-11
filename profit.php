@@ -192,12 +192,12 @@ render_header('Profit Dashboard');
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div class="p-4 border border-slate-200 rounded-lg">
                 <p class="text-slate-500">Revenue</p>
-                <p class="text-2xl font-semibold text-slate-900">₩<?= number_format($current['revenue'], 2) ?></p>
+                <p class="text-2xl font-semibold text-slate-900"><?= number_format($current['revenue'], 2) ?> so'm</p>
                 <?= trendBadge($current['revenue'], $comparison['revenue']) ?>
             </div>
             <div class="p-4 border border-slate-200 rounded-lg">
                 <p class="text-slate-500">Gross Profit</p>
-                <p class="text-2xl font-semibold text-emerald-600">₩<?= number_format($current['gross_profit'], 2) ?></p>
+                <p class="text-2xl font-semibold text-emerald-600"><?= number_format($current['gross_profit'], 2) ?> so'm</p>
                 <?= trendBadge($current['gross_profit'], $comparison['gross_profit']) ?>
             </div>
             <div class="p-4 border border-slate-200 rounded-lg">
@@ -207,7 +207,7 @@ render_header('Profit Dashboard');
             </div>
             <div class="p-4 border border-slate-200 rounded-lg">
                 <p class="text-slate-500">Average Order Value</p>
-                <p class="text-2xl font-semibold text-slate-900">₩<?= number_format($current['average_order'], 2) ?></p>
+                <p class="text-2xl font-semibold text-slate-900"><?= number_format($current['average_order'], 2) ?> so'm</p>
                 <?= trendBadge($current['average_order'], $comparison['average_order']) ?>
             </div>
         </div>
@@ -215,10 +215,10 @@ render_header('Profit Dashboard');
     <section class="bg-white border border-slate-200 rounded-lg p-5">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">Cash vs Click</h3>
         <ul class="space-y-2 text-sm">
-            <li class="flex justify-between"><span class="text-slate-500">Cash collected</span><span class="text-emerald-600 font-medium">₩<?= number_format($current['cash'], 2) ?></span></li>
-            <li class="flex justify-between"><span class="text-slate-500">Click collected</span><span class="text-emerald-600 font-medium">₩<?= number_format($current['click'], 2) ?></span></li>
-            <li class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500">Collections</span><span class="text-slate-700">₩<?= number_format($current['collections'], 2) ?></span></li>
-            <li class="flex justify-between"><span class="text-slate-500">Closing debt</span><span class="text-rose-600 font-medium">₩<?= number_format($current['closing_debt'], 2) ?></span></li>
+            <li class="flex justify-between"><span class="text-slate-500">Cash collected</span><span class="text-emerald-600 font-medium"><?= number_format($current['cash'], 2) ?> so'm</span></li>
+            <li class="flex justify-between"><span class="text-slate-500">Click collected</span><span class="text-emerald-600 font-medium"><?= number_format($current['click'], 2) ?> so'm</span></li>
+            <li class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500">Collections</span><span class="text-slate-700"><?= number_format($current['collections'], 2) ?> so'm</span></li>
+            <li class="flex justify-between"><span class="text-slate-500">Closing debt</span><span class="text-rose-600 font-medium"><?= number_format($current['closing_debt'], 2) ?> so'm</span></li>
         </ul>
     </section>
 </div>
@@ -227,10 +227,10 @@ render_header('Profit Dashboard');
     <section class="bg-white border border-slate-200 rounded-lg p-5">
         <h3 class="text-lg font-semibold text-slate-800 mb-3">Debtor Movement</h3>
         <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="text-slate-500">Opening debt</dt><dd class="text-slate-700">₩<?= number_format($current['opening_debt'], 2) ?></dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">Collections</dt><dd class="text-emerald-600">₩<?= number_format($current['collections'], 2) ?></dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">New debt</dt><dd class="text-rose-600">₩<?= number_format($current['new_debt'], 2) ?></dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">Closing debt</dt><dd class="text-slate-800 font-semibold">₩<?= number_format($current['closing_debt'], 2) ?></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Opening debt</dt><dd class="text-slate-700"><?= number_format($current['opening_debt'], 2) ?> so'm</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Collections</dt><dd class="text-emerald-600"><?= number_format($current['collections'], 2) ?> so'm</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">New debt</dt><dd class="text-rose-600"><?= number_format($current['new_debt'], 2) ?> so'm</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Closing debt</dt><dd class="text-slate-800 font-semibold"><?= number_format($current['closing_debt'], 2) ?> so'm</dd></div>
         </dl>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
@@ -258,7 +258,7 @@ render_header('Profit Dashboard');
                     <?php foreach ($dailyTrend as $day): ?>
                         <tr>
                             <td class="py-2 text-slate-600"><?= htmlspecialchars($day['day']) ?></td>
-                            <td class="py-2 text-slate-800">₩<?= number_format((float)$day['revenue'], 2) ?></td>
+                            <td class="py-2 text-slate-800"><?= number_format((float)$day['revenue'], 2) ?> so'm</td>
                             <td class="py-2 text-slate-600"><?= number_format((float)$day['units'], 2) ?></td>
                         </tr>
                     <?php endforeach; ?>
@@ -288,8 +288,8 @@ render_header('Profit Dashboard');
                         <tr>
                             <td class="py-2 text-slate-700"><?= htmlspecialchars($product['name']) ?></td>
                             <td class="py-2 text-slate-600"><?= number_format($product['quantity'], 2) ?></td>
-                            <td class="py-2 text-slate-800">₩<?= number_format($product['revenue'], 2) ?></td>
-                            <td class="py-2 text-emerald-600">₩<?= number_format($product['profit'], 2) ?></td>
+                            <td class="py-2 text-slate-800"><?= number_format($product['revenue'], 2) ?> so'm</td>
+                            <td class="py-2 text-emerald-600"><?= number_format($product['profit'], 2) ?> so'm</td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>

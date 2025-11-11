@@ -77,7 +77,7 @@ render_header('Products');
                                 <td class="py-2 text-slate-500"><?= htmlspecialchars($product['sku'] ?? '-') ?></td>
                                 <td class="py-2 font-medium text-slate-800"><?= htmlspecialchars($product['name']) ?></td>
                                 <td class="py-2 text-slate-600"><?= htmlspecialchars($product['unit']) ?></td>
-                                <td class="py-2 text-slate-800">₩<?= number_format((float)$product['default_price'], 2) ?></td>
+                                <td class="py-2 text-slate-800"><?= number_format((float)$product['default_price'], 2) ?> so'm</td>
                                 <td class="py-2">
                                     <a href="products.php?edit=<?= (int)$product['id'] ?>" class="text-blue-600 hover:text-blue-800 text-xs mr-3">Edit</a>
                                     <a href="products.php?delete=<?= (int)$product['id'] ?>" class="text-rose-600 hover:text-rose-800 text-xs" onclick="return confirm('Delete this product?');">Delete</a>
@@ -122,7 +122,7 @@ render_header('Products');
                 <input type="text" name="unit" value="<?= htmlspecialchars($editingProduct['unit'] ?? '') ?>" required class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="e.g. bottle, can, pack">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Default selling price (₩)</label>
+                <label class="block text-sm font-medium text-slate-700">Default selling price (so'm)</label>
                 <input type="number" step="0.01" min="0" name="default_price" value="<?= htmlspecialchars($editingProduct['default_price'] ?? '0') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
             </div>
             <div class="pt-2">

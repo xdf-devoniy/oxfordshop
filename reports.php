@@ -102,15 +102,15 @@ render_header('Reports');
         <dl class="space-y-2 text-sm">
             <div class="flex justify-between">
                 <dt class="text-slate-500">Revenue</dt>
-                <dd class="text-slate-800 font-semibold">₩<?= number_format($revenue, 2) ?></dd>
+                <dd class="text-slate-800 font-semibold"><?= number_format($revenue, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
                 <dt class="text-slate-500">COGS</dt>
-                <dd class="text-slate-600">₩<?= number_format($cogs, 2) ?></dd>
+                <dd class="text-slate-600"><?= number_format($cogs, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
                 <dt class="text-slate-500">Gross profit</dt>
-                <dd class="text-emerald-600 font-semibold">₩<?= number_format($grossProfit, 2) ?></dd>
+                <dd class="text-emerald-600 font-semibold"><?= number_format($grossProfit, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
                 <dt class="text-slate-500">Profit margin</dt>
@@ -131,20 +131,20 @@ render_header('Reports');
                 <?php foreach ($paymentsByMethod as $row): ?>
                     <li class="flex justify-between">
                         <span class="uppercase text-slate-500"><?= htmlspecialchars($row['payment_method']) ?></span>
-                        <span class="text-emerald-600 font-medium">₩<?= number_format((float)$row['total'], 2) ?></span>
+                        <span class="text-emerald-600 font-medium"><?= number_format((float)$row['total'], 2) ?> so'm</span>
                     </li>
                 <?php endforeach; ?>
             <?php endif; ?>
             <li class="flex justify-between pt-2 border-t border-slate-200 mt-2">
                 <span class="text-slate-600">Outstanding</span>
-                <span class="text-rose-600 font-medium">₩<?= number_format((float)$outstanding, 2) ?></span>
+                <span class="text-rose-600 font-medium"><?= number_format((float)$outstanding, 2) ?> so'm</span>
             </li>
         </ul>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">Purchases</h3>
         <p class="text-sm text-slate-500">Stock investment for this period.</p>
-        <p class="text-2xl font-semibold text-slate-800 mt-2">₩<?= number_format((float)$purchasesTotal, 2) ?></p>
+        <p class="text-2xl font-semibold text-slate-800 mt-2"><?= number_format((float)$purchasesTotal, 2) ?> so'm</p>
         <p class="text-xs text-slate-500 mt-1">Compare against sales to monitor cashflow.</p>
     </section>
 </div>
@@ -170,7 +170,7 @@ render_header('Reports');
                         <tr>
                             <td class="py-2 text-slate-700"><?= htmlspecialchars($row['name']) ?> (<?= htmlspecialchars($row['unit']) ?>)</td>
                             <td class="py-2 text-slate-600"><?= number_format((float)$row['quantity'], 2) ?></td>
-                            <td class="py-2 text-slate-800">₩<?= number_format((float)$row['revenue'], 2) ?></td>
+                            <td class="py-2 text-slate-800"><?= number_format((float)$row['revenue'], 2) ?> so'm</td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -202,7 +202,7 @@ render_header('Reports');
                         <tr>
                             <td class="py-2 text-slate-700"><?= htmlspecialchars($stock['name']) ?></td>
                             <td class="py-2 text-slate-600"><?= number_format((float)$stock['stock'], 2) ?> <?= htmlspecialchars($stock['unit']) ?></td>
-                            <td class="py-2 text-slate-800">₩<?= number_format($value, 2) ?></td>
+                            <td class="py-2 text-slate-800"><?= number_format($value, 2) ?> so'm</td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
