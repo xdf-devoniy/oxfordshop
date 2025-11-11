@@ -20,11 +20,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sale_id'])) {
     }
     if ($date === '') {
         $errors[] = 'Payment date is required.';
+    } else {
+        try {
+            new DateTime($date);
+        } catch (Exception $e) {
+            $errors[] = 'Payment date is invalid.';
+        }
     }
 
     $saleExists = fetchOne($pdo, 'SELECT id FROM sales WHERE id = ?', [$saleId]);
     if (!$saleExists) {
         $errors[] = 'Receipt not found.';
+    }
+
+    if (empty($errors)) {
+        $summary = salePaymentSummary($pdo, $saleId);
+        if ($summary['balance'] <= 0.0001) {
+            $errors[] = 'This receipt is already fully settled.';
+        } elseif ($amount > $summary['balance'] + 0.0001) {
+            $errors[] = 'Payment exceeds the remaining balance of ₩' . number_format($summary['balance'], 2) . '.';
+        }
     }
 
     if (empty($errors)) {
@@ -119,8 +134,9 @@ render_header('Receipts');
             <?php
             $items = fetchAll($pdo, 'SELECT si.*, p.name, p.unit FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = ?', [$saleId]);
             $payments = fetchAll($pdo, 'SELECT * FROM payments WHERE sale_id = ? ORDER BY payment_date ASC', [$saleId]);
-            $totalPaid = array_sum(array_column($payments, 'amount'));
-            $balance = (float)$sale['total_amount'] - $totalPaid;
+            $summary = salePaymentSummary($pdo, $saleId);
+            $totalPaid = $summary['total_paid'];
+            $balance = $summary['balance'];
             ?>
             <div class="space-y-3 text-sm">
                 <div>
@@ -160,46 +176,51 @@ render_header('Receipts');
             </div>
             <hr class="my-4">
             <h4 class="font-semibold text-slate-700 mb-2">Add payment</h4>
-            <?php if (!empty($errors)): ?>
-                <div class="mb-3 border border-rose-200 bg-rose-50 text-rose-700 text-sm px-3 py-2 rounded">
-                    <ul class="list-disc pl-4">
-                        <?php foreach ($errors as $error): ?>
-                            <li><?= htmlspecialchars($error) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php elseif ($success): ?>
-                <div class="mb-3 border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm px-3 py-2 rounded">
-                    <?= htmlspecialchars($success) ?>
-                </div>
+            <?php if ($balance <= 0.0001): ?>
+                <p class="text-sm text-slate-500">This receipt is fully paid. No further payments are required.</p>
+            <?php else: ?>
+                <?php if (!empty($errors)): ?>
+                    <div class="mb-3 border border-rose-200 bg-rose-50 text-rose-700 text-sm px-3 py-2 rounded">
+                        <ul class="list-disc pl-4">
+                            <?php foreach ($errors as $error): ?>
+                                <li><?= htmlspecialchars($error) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php elseif ($success): ?>
+                    <div class="mb-3 border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm px-3 py-2 rounded">
+                        <?= htmlspecialchars($success) ?>
+                    </div>
+                <?php endif; ?>
+                <form method="post" class="space-y-3">
+                    <input type="hidden" name="sale_id" value="<?= (int)$sale['id'] ?>">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Amount (₩)</label>
+                        <input type="number" step="0.01" min="0" max="<?= htmlspecialchars(number_format($balance, 2, '.', '')) ?>" name="amount" value="<?= htmlspecialchars($_POST['amount'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
+                        <p class="text-xs text-slate-500 mt-1">Remaining balance: ₩<?= number_format($balance, 2) ?></p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Method</label>
+                            <select name="method" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
+                                <option value="cash" <?= (($_POST['method'] ?? '') === 'cash') ? 'selected' : '' ?>>Cash</option>
+                                <option value="click" <?= (($_POST['method'] ?? '') === 'click') ? 'selected' : '' ?>>Click</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Payment date</label>
+                            <input type="date" name="payment_date" value="<?= htmlspecialchars($_POST['payment_date'] ?? date('Y-m-d')) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Notes (optional)</label>
+                        <textarea name="notes" rows="2" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
+                    </div>
+                    <div>
+                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800">Add payment</button>
+                    </div>
+                </form>
             <?php endif; ?>
-            <form method="post" class="space-y-3">
-                <input type="hidden" name="sale_id" value="<?= (int)$sale['id'] ?>">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Amount (₩)</label>
-                    <input type="number" step="0.01" min="0" name="amount" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Method</label>
-                        <select name="method" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
-                            <option value="cash">Cash</option>
-                            <option value="click">Click</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Payment date</label>
-                        <input type="date" name="payment_date" value="<?= htmlspecialchars(date('Y-m-d')) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Notes (optional)</label>
-                    <textarea name="notes" rows="2" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400"></textarea>
-                </div>
-                <div>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800">Add payment</button>
-                </div>
-            </form>
         <?php else: ?>
             <p class="text-sm text-slate-500">Select a receipt from the list to view details and add payments.</p>
         <?php endif; ?>

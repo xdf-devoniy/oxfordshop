@@ -21,7 +21,18 @@ function render_header(string $title): void
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title><?= htmlspecialchars($title) ?> · Beverage & Snack POS</title>
-        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
+        <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        colors: {
+                            brand: '#0f172a'
+                        }
+                    }
+                }
+            };
+        </script>
         <style>
             body { background-color: #f8fafc; }
             .nav-active { background-color: #0f172a; color: #f8fafc; }

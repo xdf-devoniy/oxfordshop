@@ -115,4 +115,42 @@ function execute(PDO $pdo, string $sql, array $params = []): bool
     return $stmt->execute($params);
 }
 
+function productStockSnapshot(PDO $pdo): array
+{
+    $rows = fetchAll($pdo, 'SELECT p.id,
+        IFNULL((SELECT SUM(quantity) FROM purchases WHERE product_id = p.id),0) +
+        IFNULL((SELECT SUM(quantity_change) FROM adjustments WHERE product_id = p.id),0) -
+        IFNULL((SELECT SUM(quantity) FROM sale_items WHERE product_id = p.id),0) AS stock
+        FROM products p');
+
+    $stock = [];
+    foreach ($rows as $row) {
+        $stock[(int)$row['id']] = (float)$row['stock'];
+    }
+
+    return $stock;
+}
+
+function salePaymentSummary(PDO $pdo, int $saleId): array
+{
+    $row = fetchOne($pdo, 'SELECT s.total_amount,
+            IFNULL(paid.total_paid, 0) AS total_paid,
+            (s.total_amount - IFNULL(paid.total_paid, 0)) AS balance
+        FROM sales s
+        LEFT JOIN (
+            SELECT sale_id, SUM(amount) AS total_paid FROM payments GROUP BY sale_id
+        ) paid ON paid.sale_id = s.id
+        WHERE s.id = ?', [$saleId]);
+
+    if (!$row) {
+        return ['total_amount' => 0.0, 'total_paid' => 0.0, 'balance' => 0.0];
+    }
+
+    return [
+        'total_amount' => (float)$row['total_amount'],
+        'total_paid' => (float)$row['total_paid'],
+        'balance' => (float)$row['balance'],
+    ];
+}
+
 runMigrations($pdo);
