@@ -4,23 +4,23 @@ require_once __DIR__ . '/db.php';
 function render_header(string $title): void
 {
     $pages = [
-        'Dashboard' => 'dashboard.php',
-        'Products' => 'products.php',
-        'Purchases' => 'purchases.php',
-        'Sales' => 'sales.php',
-        'Receipts' => 'receipts.php',
-        'Debtors' => 'debtors.php',
-        'Reports' => 'reports.php',
-        'Profit' => 'profit.php',
-        'Export' => 'export.php',
+        'Boshqaruv paneli' => 'dashboard.php',
+        'Mahsulotlar' => 'products.php',
+        'Xaridlar' => 'purchases.php',
+        'Savdolar' => 'sales.php',
+        'Cheklar' => 'receipts.php',
+        'Qarzdorlar' => 'debtors.php',
+        'Hisobotlar' => 'reports.php',
+        'Foyda' => 'profit.php',
+        'Eksport' => 'export.php',
     ];
     ?>
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="uz">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title><?= htmlspecialchars($title) ?> · Beverage & Snack POS</title>
+        <title><?= htmlspecialchars($title) ?> · Ichimlik va Gazak POS</title>
         <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
         <script>
             tailwind.config = {
@@ -41,8 +41,8 @@ function render_header(string $title): void
     <body class="min-h-screen flex">
         <aside class="w-64 bg-slate-900 text-white min-h-screen hidden md:block">
             <div class="p-6 border-b border-slate-700">
-                <h1 class="text-xl font-semibold">Beverage & Snack POS</h1>
-                <p class="text-sm text-slate-400">Single-User Dashboard</p>
+                <h1 class="text-xl font-semibold">Ichimlik va Gazak POS</h1>
+                <p class="text-sm text-slate-400">Yakka foydalanuvchi tizimi</p>
             </div>
             <nav class="p-4 space-y-1">
                 <?php foreach ($pages as $label => $href): $active = basename($_SERVER['PHP_SELF']) === $href; ?>
@@ -58,9 +58,9 @@ function render_header(string $title): void
                 <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div>
                         <h2 class="text-2xl font-semibold text-slate-800"><?= htmlspecialchars($title) ?></h2>
-                        <p class="text-sm text-slate-500">Manage your beverage & snack business with confidence.</p>
+                        <p class="text-sm text-slate-500">Kichik do'koningizni bir joydan boshqaring.</p>
                     </div>
-                    <a href="dashboard.php" class="text-sm text-blue-600 hover:text-blue-800">Back to dashboard</a>
+                    <a href="dashboard.php" class="text-sm text-blue-600 hover:text-blue-800">Bosh sahifaga qaytish</a>
                 </div>
             </header>
             <main class="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
@@ -73,7 +73,7 @@ function render_footer(): void
             </main>
             <footer class="bg-white border-t border-slate-200">
                 <div class="max-w-6xl mx-auto px-4 py-4 text-sm text-slate-500">
-                    &copy; <?= date('Y') ?> Beverage & Snack POS · Built with SQLite & PHP
+                    &copy; <?= date('Y') ?> Ichimlik va Gazak POS · SQLite va PHP asosida
                 </div>
             </footer>
         </div>

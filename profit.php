@@ -160,7 +160,7 @@ foreach ($current['sales_by_product'] as $row) {
 usort($topProducts, fn($a, $b) => $b['profit'] <=> $a['profit']);
 $topProducts = array_slice($topProducts, 0, 10);
 
-render_header('Profit Dashboard');
+render_header('Foyda paneli');
 ?>
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
     <form method="get" class="flex flex-wrap gap-3 text-sm items-end">

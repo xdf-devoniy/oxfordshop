@@ -65,7 +65,7 @@ $walkInOutstanding = fetchOne($pdo, 'SELECT IFNULL(SUM(s.total_amount - IFNULL(p
     WHERE s.customer_id IS NULL AND s.total_amount > IFNULL(pay.total_paid,0)');
 $walkInOutstanding = $walkInOutstanding ? (float)$walkInOutstanding['outstanding'] : 0.0;
 
-render_header('Debtors');
+render_header('Qarzdorlar');
 ?>
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">

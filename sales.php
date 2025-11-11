@@ -4,159 +4,131 @@ require_once __DIR__ . '/inc/layout.php';
 $errors = [];
 $success = null;
 $lastSale = null;
+
 $products = fetchAll($pdo, 'SELECT * FROM products ORDER BY name');
 $customers = fetchAll($pdo, 'SELECT * FROM customers ORDER BY name');
 $stockLevels = productStockSnapshot($pdo);
+
 $productLookup = [];
 foreach ($products as $product) {
     $productLookup[(int)$product['id']] = $product;
 }
 
+$currentMode = $_POST['payment_mode'] ?? 'cash';
+$saleDate = $_POST['sale_date'] ?? date('Y-m-d');
+$notes = trim($_POST['notes'] ?? '');
+$selectedCustomerId = isset($_POST['customer_id']) ? (int)$_POST['customer_id'] : 0;
+$newCustomerName = trim($_POST['new_customer'] ?? '');
+
+$cartPrefill = [];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $saleDate = trim($_POST['sale_date'] ?? date('Y-m-d'));
-    $customerId = (int)($_POST['customer_id'] ?? 0);
-    $newCustomer = trim($_POST['new_customer'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
-    $items = $_POST['items'] ?? [];
-    $paymentMode = $_POST['payment_mode'] ?? 'full_cash';
-    $partialAmount = (float)($_POST['partial_amount'] ?? 0);
-    $partialMethod = $_POST['partial_method'] ?? 'cash';
-    $partialDate = trim($_POST['partial_date'] ?? $saleDate);
+    $currentMode = $_POST['payment_mode'] ?? 'cash';
+    $selectedCustomerId = isset($_POST['customer_id']) ? (int)$_POST['customer_id'] : 0;
+    $newCustomerName = trim($_POST['new_customer'] ?? '');
 
     if ($saleDate === '') {
-        $errors[] = 'Sale date is required.';
+        $errors[] = "Savdo sanasini tanlang.";
     } else {
         try {
             new DateTime($saleDate);
         } catch (Exception $e) {
-            $errors[] = 'Sale date is invalid.';
+            $errors[] = "Savdo sanasi noto'g'ri.";
         }
+    }
+
+    $rawCart = $_POST['cart_payload'] ?? '[]';
+    $cartData = json_decode($rawCart, true);
+    if (!is_array($cartData)) {
+        $cartData = [];
+    }
+
+    if (empty($cartData)) {
+        $errors[] = "Savdoga kamida bitta mahsulot qo'shing.";
     }
 
     $preparedItems = [];
-    $totalAmount = 0;
+    $totalAmount = 0.0;
     $requestedByProduct = [];
 
-    if (empty($items)) {
-        $errors[] = 'Add at least one item to the sale.';
-    } else {
-        foreach ($items as $item) {
-            $productId = (int)($item['product_id'] ?? 0);
-            $quantity = (float)($item['quantity'] ?? 0);
-            $unitPrice = (float)($item['unit_price'] ?? 0);
+    foreach ($cartData as $entry) {
+        $productId = (int)($entry['product_id'] ?? 0);
+        $quantity = (float)($entry['quantity'] ?? 0);
 
-            if ($productId <= 0 && ($quantity > 0 || $unitPrice > 0)) {
-                $errors[] = 'Select a product for each line item.';
-                continue;
-            }
-
-            if ($productId <= 0) {
-                continue;
-            }
-
-            $name = $productLookup[$productId]['name'] ?? 'selected product';
-            $unitLabel = $productLookup[$productId]['unit'] ?? '';
-
-            if ($quantity <= 0) {
-                $errors[] = 'Quantity must be greater than zero for ' . $name . '.';
-                continue;
-            }
-
-            if ($unitPrice <= 0) {
-                $errors[] = 'Unit price must be greater than zero for ' . $name . '.';
-                continue;
-            }
-
-            $requestedByProduct[$productId] = ($requestedByProduct[$productId] ?? 0) + $quantity;
-            $available = $stockLevels[$productId] ?? 0.0;
-            if ($requestedByProduct[$productId] > $available + 0.0001) {
-                $errors[] = sprintf(
-                    'Insufficient stock for %s. Requested %s %s but only %s available.',
-                    $name,
-                    number_format($requestedByProduct[$productId], 2),
-                    $unitLabel,
-                    number_format($available, 2)
-                );
-            }
-
-            $lineTotal = $quantity * $unitPrice;
-            $totalAmount += $lineTotal;
-            $preparedItems[] = [
-                'product_id' => $productId,
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'total' => $lineTotal,
-            ];
+        if ($productId <= 0 || !isset($productLookup[$productId])) {
+            $errors[] = "Tanlangan mahsulot topilmadi.";
+            continue;
         }
+
+        if ($quantity <= 0) {
+            $errors[] = sprintf("%s uchun miqdor 0 dan katta bo'lishi kerak.", $productLookup[$productId]['name']);
+            continue;
+        }
+
+        $requestedByProduct[$productId] = ($requestedByProduct[$productId] ?? 0) + $quantity;
+        $available = (float)($stockLevels[$productId] ?? 0);
+        if ($requestedByProduct[$productId] > $available + 0.0001) {
+            $errors[] = sprintf(
+                "%s uchun ombordagi qoldiq yetarli emas. So'ralgan: %s, mavjud: %s",
+                $productLookup[$productId]['name'],
+                number_format($requestedByProduct[$productId], 2),
+                number_format($available, 2)
+            );
+            continue;
+        }
+
+        $unitPrice = (float)$productLookup[$productId]['default_price'];
+        if ($unitPrice <= 0) {
+            $errors[] = sprintf("%s uchun narx 0 dan katta bo'lishi kerak.", $productLookup[$productId]['name']);
+            continue;
+        }
+
+        $lineTotal = $quantity * $unitPrice;
+        $totalAmount += $lineTotal;
+        $preparedItems[] = [
+            'product_id' => $productId,
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'total' => $lineTotal,
+        ];
+
+        $cartPrefill[] = [
+            'product_id' => $productId,
+            'quantity' => $quantity,
+        ];
     }
 
     if ($totalAmount <= 0) {
-        $errors[] = 'Sale total must be greater than zero.';
+        $errors[] = "Savdo summasi nol bo'lishi mumkin emas.";
     }
 
-    $pendingCustomerName = $newCustomer !== '' ? $newCustomer : null;
-    if ($customerId === 0) {
-        $customerId = null;
+    if (!in_array($currentMode, ['cash', 'click', 'debt'], true)) {
+        $errors[] = "To'lov usulini tanlang.";
     }
 
-    $paymentAmount = 0;
+    $customerId = $selectedCustomerId ?: null;
+    $pendingCustomerName = $newCustomerName !== '' ? $newCustomerName : null;
+
+    if ($currentMode === 'debt' && $customerId === null && $pendingCustomerName === null) {
+        $errors[] = "Qarz uchun mijozni tanlang yoki yangi mijoz kiriting.";
+    }
+
+    $paymentAmount = 0.0;
     $paymentMethod = null;
     $paymentDate = $saleDate;
 
-    switch ($paymentMode) {
-        case 'full_cash':
-            $paymentAmount = $totalAmount;
-            $paymentMethod = 'cash';
-            break;
-        case 'full_click':
-            $paymentAmount = $totalAmount;
-            $paymentMethod = 'click';
-            break;
-        case 'debt':
-            if ($pendingCustomerName === null && $customerId === null) {
-                $errors[] = 'Select an existing customer or enter a new one for debt sales.';
-            }
-            $paymentAmount = 0;
-            $paymentMethod = null;
-            $paymentDate = null;
-            break;
-        case 'partial':
-            if ($pendingCustomerName === null && $customerId === null) {
-                $errors[] = 'Select an existing customer or enter a new one for partial payments.';
-            }
-            if ($partialAmount <= 0) {
-                $errors[] = 'Partial payment amount must be greater than zero.';
-            }
-            if ($partialAmount >= $totalAmount - 0.0001) {
-                $errors[] = 'Partial payment must be less than the total sale.';
-            }
-            if (!in_array($partialMethod, ['cash', 'click'], true)) {
-                $errors[] = 'Select a valid payment method.';
-            }
-            if ($partialDate === '') {
-                $errors[] = 'Partial payment date is required.';
-            } else {
-                try {
-                    new DateTime($partialDate);
-                } catch (Exception $e) {
-                    $errors[] = 'Partial payment date is invalid.';
-                }
-            }
-            $paymentAmount = $partialAmount;
-            $paymentMethod = $partialMethod;
-            $paymentDate = $partialDate;
-            break;
-        default:
-            $errors[] = 'Select a valid payment option.';
-            break;
-    }
-
-    if ($paymentAmount < 0) {
-        $errors[] = 'Payment amount cannot be negative.';
-    }
-
-    if ($paymentAmount > $totalAmount + 0.0001) {
-        $errors[] = 'Payment cannot exceed the total sale amount.';
+    if ($currentMode === 'cash') {
+        $paymentAmount = $totalAmount;
+        $paymentMethod = 'cash';
+    } elseif ($currentMode === 'click') {
+        $paymentAmount = $totalAmount;
+        $paymentMethod = 'click';
+    } else {
+        $paymentAmount = 0;
+        $paymentMethod = null;
+        $paymentDate = null;
     }
 
     if (empty($errors)) {
@@ -171,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             execute(
                 $pdo,
                 'INSERT INTO sales (customer_id, sale_date, total_amount, notes) VALUES (?, ?, ?, ?)',
-                [$customerId, $saleDate, $totalAmount, $notes ?: null]
+                [$customerId, $saleDate, $totalAmount, $notes !== '' ? $notes : null]
             );
             $saleId = (int)$pdo->lastInsertId();
 
@@ -180,11 +152,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$saleId, $line['product_id'], $line['quantity'], $line['unit_price'], $line['total']]);
             }
 
-            if ($paymentAmount > 0) {
+            if ($paymentAmount > 0 && $paymentMethod !== null) {
                 execute(
                     $pdo,
                     'INSERT INTO payments (sale_id, payment_method, amount, payment_date) VALUES (?, ?, ?, ?)',
-                    [$saleId, $paymentMethod, $paymentAmount, $paymentDate ?: $saleDate]
+                    [$saleId, $paymentMethod, $paymentAmount, $paymentDate]
                 );
             }
 
@@ -196,7 +168,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $errors[] = 'Failed to record sale. Please try again.';
+            $errors[] = "Savdoni saqlab bo'lmadi. Iltimos, qayta urinib ko'ring.";
+        }
+    }
+}
+
+if (empty($cartPrefill) && !empty($_POST['cart_payload'])) {
+    $decoded = json_decode($_POST['cart_payload'], true);
+    if (is_array($decoded)) {
+        foreach ($decoded as $entry) {
+            $productId = (int)($entry['product_id'] ?? 0);
+            $quantity = (float)($entry['quantity'] ?? 0);
+            if ($productId > 0 && $quantity > 0) {
+                $cartPrefill[] = [
+                    'product_id' => $productId,
+                    'quantity' => $quantity,
+                ];
+            }
         }
     }
 }
@@ -205,7 +193,7 @@ $recordedSaleId = isset($_GET['recorded']) ? (int)$_GET['recorded'] : null;
 if ($recordedSaleId) {
     $lastSale = fetchOne(
         $pdo,
-        'SELECT s.id, s.sale_date, s.total_amount, IFNULL(c.name, "Walk-in") AS customer_name
+        'SELECT s.id, s.sale_date, s.total_amount, IFNULL(c.name, "Doimiy mijoz emas") AS customer_name
          FROM sales s
          LEFT JOIN customers c ON c.id = s.customer_id
          WHERE s.id = ?',
@@ -213,31 +201,88 @@ if ($recordedSaleId) {
     );
     if ($lastSale) {
         $success = sprintf(
-            'Sale #%d for %s so\'m saved successfully.',
+            "Savdo №%d muvaffaqiyatli saqlandi. Umumiy summa: %s so'm.",
             $lastSale['id'],
-            number_format((float)$lastSale['total_amount'], 2)
+            number_format((float)$lastSale['total_amount'], 0, '.', ' ')
         );
     }
 }
 
-$oldItems = [];
-if (!empty($_POST['items']) && is_array($_POST['items'])) {
-    foreach ($_POST['items'] as $postedItem) {
-        $oldItems[] = [
-            'product_id' => isset($postedItem['product_id']) ? (int)$postedItem['product_id'] : '',
-            'quantity' => $postedItem['quantity'] ?? '',
-            'unit_price' => $postedItem['unit_price'] ?? '',
-        ];
-    }
-}
-if (empty($oldItems)) {
-    $oldItems[] = ['product_id' => '', 'quantity' => '', 'unit_price' => ''];
+$productClientData = array_map(function (array $product) use ($stockLevels) {
+    return [
+        'id' => (int)$product['id'],
+        'name' => $product['name'],
+        'price' => (float)$product['default_price'],
+        'unit' => $product['unit'],
+        'stock' => (float)($stockLevels[$product['id']] ?? 0),
+    ];
+}, $products);
+
+$catalogJson = json_encode($productClientData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+if ($catalogJson === false) {
+    $catalogJson = '[]';
 }
 
-$currentMode = $_POST['payment_mode'] ?? 'full_cash';
+$cartJson = json_encode($cartPrefill, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+if ($cartJson === false) {
+    $cartJson = '[]';
+}
 
-render_header('Sales');
+render_header('Savdolar');
 ?>
+<style>
+    .product-button {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.85rem;
+        text-align: left;
+        background-color: #ffffff;
+        transition: all 0.15s ease-in-out;
+    }
+    .product-button:not([data-disabled="1"]):hover {
+        border-color: #0f172a;
+        box-shadow: 0 10px 25px -15px rgba(15, 23, 42, 0.4);
+    }
+    .product-button[data-disabled="1"] {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+    .product-button [data-selected-pill] {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border-radius: 9999px;
+        background-color: #dcfce7;
+        color: #166534;
+        font-size: 0.75rem;
+        padding: 0.1rem 0.5rem;
+    }
+    .payment-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.85rem;
+        display: flex;
+        gap: 0.65rem;
+        align-items: flex-start;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+    }
+    .payment-card input {
+        display: none;
+    }
+    .payment-card.active {
+        border-color: #0f172a;
+        background-color: #0f172a;
+        color: #f8fafc;
+    }
+    .payment-card:not(.active):hover {
+        border-color: #cbd5f5;
+        box-shadow: 0 10px 25px -15px rgba(15, 23, 42, 0.4);
+    }
+</style>
 <div class="space-y-6">
     <?php if (!empty($errors)): ?>
         <div class="border border-rose-200 bg-rose-50 text-rose-700 text-sm px-3 py-2 rounded">
@@ -251,479 +296,332 @@ render_header('Sales');
         <div class="border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm px-3 py-2 rounded flex items-center justify-between">
             <span><?= htmlspecialchars($success) ?></span>
             <?php if (!empty($lastSale)): ?>
-                <a href="receipts.php?sale_id=<?= (int)$lastSale['id'] ?>" class="text-xs underline">Open receipt</a>
+                <a href="receipts.php?sale_id=<?= (int)$lastSale['id'] ?>" class="text-xs underline">Chekni ko'rish</a>
             <?php endif; ?>
         </div>
     <?php endif; ?>
 
     <?php if (empty($products)): ?>
         <div class="bg-white border border-slate-200 rounded-lg p-6 text-sm text-slate-600">
-            Add products before recording sales. Head over to <a class="text-blue-600" href="products.php">Products</a> to get started.
+            Avval mahsulot qo'shing. <a class="text-blue-600" href="products.php">Mahsulotlar</a> bo'limiga o'ting.
         </div>
     <?php else: ?>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">
-                <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-800">Create a new sale</h3>
-                        <p class="text-sm text-slate-500">Add items to the cart and capture payment or debt in one streamlined flow.</p>
-                    </div>
-                    <a href="receipts.php" class="text-sm text-blue-600">Receipt history</a>
-                </div>
-
-                <form method="post" class="space-y-6" id="sale-form">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700">Sale date</label>
-                            <input type="date" name="sale_date" value="<?= htmlspecialchars($_POST['sale_date'] ?? date('Y-m-d')) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-slate-700">Notes</label>
-                            <textarea name="notes" rows="2" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Optional remarks about this sale."><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">Sale cart</h4>
-                            <div class="flex items-center gap-2 text-xs text-slate-500">
-                                <span>Need a manual line?</span>
-                                <button type="button" id="add-line" class="text-blue-600 text-sm">Add item</button>
+        <form method="post" class="space-y-6" id="sale-form">
+            <input type="hidden" name="cart_payload" id="cart-payload" value='<?= htmlspecialchars($cartJson, ENT_QUOTES, 'UTF-8') ?>'>
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <section class="xl:col-span-2">
+                    <div class="bg-white border border-slate-200 rounded-lg p-5">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-slate-800">Mahsulot katalogi</h3>
+                                <p class="text-sm text-slate-500">Pastdagi tugmalardan foydalanib savdo chekingizni to'ldiring.</p>
+                            </div>
+                            <div class="text-right text-xs text-slate-400">
+                                Ombordagi qoldiq asosida mahsulotlar cheklanadi.
                             </div>
                         </div>
-                        <div class="border border-slate-200 rounded-lg overflow-hidden">
-                            <div class="overflow-x-auto">
-                                <div class="max-h-72 overflow-y-auto">
-                                    <table class="min-w-full text-sm" id="items-table">
-                                        <thead class="bg-slate-50">
-                                            <tr class="text-left text-xs uppercase text-slate-500">
-                                                <th class="px-3 py-2">Product</th>
-                                                <th class="px-3 py-2">Quantity</th>
-                                                <th class="px-3 py-2">Unit price</th>
-                                                <th class="px-3 py-2">Line total</th>
-                                                <th class="px-3 py-2">Remove</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-slate-100" id="cart-body">
-                                            <?php foreach ($oldItems as $index => $item): ?>
-                                                <?php
-                                                    $selectedProductId = $item['product_id'] !== '' ? (int)$item['product_id'] : null;
-                                                    $available = $selectedProductId ? ($stockLevels[$selectedProductId] ?? 0) : null;
-                                                ?>
-                                                <tr>
-                                                    <td class="px-3 py-2">
-                                                        <select name="items[<?= $index ?>][product_id]" class="w-full border border-slate-300 rounded-md px-2 py-2 text-sm" required>
-                                                            <option value="">Select</option>
-                                                            <?php foreach ($products as $product): ?>
-                                                                <?php $optionStock = $stockLevels[$product['id']] ?? 0; ?>
-                                                                <option value="<?= (int)$product['id'] ?>" data-price="<?= htmlspecialchars($product['default_price']) ?>" data-stock="<?= htmlspecialchars($optionStock) ?>" <?= $selectedProductId === (int)$product['id'] ? 'selected' : '' ?>>
-                                                                    <?= htmlspecialchars($product['name']) ?> (<?= htmlspecialchars($product['unit']) ?> · stock <?= number_format($optionStock, 2) ?>)
-                                                                </option>
-                                                            <?php endforeach; ?>
-                                                        </select>
-                                                    </td>
-                                                    <td class="px-3 py-2">
-                                                        <input type="number" step="0.01" min="0" name="items[<?= $index ?>][quantity]" value="<?= htmlspecialchars($item['quantity']) ?>" class="w-full border border-slate-300 rounded-md px-2 py-2 text-sm quantity" <?php if ($available !== null): ?>max="<?= htmlspecialchars(number_format($available, 2, '.', '')) ?>" placeholder="Max <?= number_format($available, 2) ?>"<?php endif; ?> required>
-                                                    </td>
-                                                    <td class="px-3 py-2">
-                                                        <input type="number" step="0.01" min="0" name="items[<?= $index ?>][unit_price]" value="<?= htmlspecialchars($item['unit_price']) ?>" class="w-full border border-slate-300 rounded-md px-2 py-2 text-sm price" required>
-                                                    </td>
-                                                    <td class="px-3 py-2 text-slate-700"><span class="line-total">0.00</span> so'm</td>
-                                                    <td class="px-3 py-2 text-center">
-                                                        <button type="button" class="text-rose-600 remove-line">Remove</button>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                        <tfoot class="bg-slate-50">
-                                            <tr>
-                                                <td colspan="3" class="px-3 py-2 text-right font-medium text-slate-700">Grand total</td>
-                                                <td class="px-3 py-2 font-semibold text-slate-900"><span id="grand-total">0.00</span> so'm</td>
-                                                <td></td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="product-grid">
+                            <?php foreach ($products as $product): ?>
+                                <?php
+                                    $price = (float)$product['default_price'];
+                                    $stock = (float)($stockLevels[$product['id']] ?? 0);
+                                    $disabled = $stock <= 0 || $price <= 0;
+                                ?>
+                                <button type="button"
+                                        id="product-card-<?= (int)$product['id'] ?>"
+                                        class="product-button"
+                                        data-id="<?= (int)$product['id'] ?>"
+                                        data-stock="<?= htmlspecialchars(number_format($stock, 2, '.', '')) ?>"
+                                        data-price="<?= htmlspecialchars(number_format($price, 2, '.', '')) ?>"
+                                        data-disabled="<?= $disabled ? '1' : '0' ?>"
+                                        <?= $disabled ? 'disabled' : '' ?>>
+                                    <div class="font-semibold text-slate-800 truncate" title="<?= htmlspecialchars($product['name']) ?>">
+                                        <?= htmlspecialchars($product['name']) ?>
+                                    </div>
+                                    <div class="text-sm text-slate-500 flex items-center justify-between">
+                                        <span><?= number_format($price, 0, '.', ' ') ?> so'm</span>
+                                        <span><?= htmlspecialchars($product['unit']) ?></span>
+                                    </div>
+                                    <div class="text-xs <?= $stock > 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
+                                        <?= $stock > 0 ? 'Omborda: ' . number_format($stock, 2) : 'Omborda mavjud emas' ?>
+                                    </div>
+                                    <span class="hidden" data-selected-pill>
+                                        Tanlangan: <span data-selected-count>0</span>
+                                    </span>
+                                </button>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </section>
+                <section class="space-y-6">
+                    <div class="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Savdo sanasi</label>
+                            <input type="date" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Izoh</label>
+                            <textarea name="notes" rows="3" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Masalan: tushlik vaqti savdosi."><?= htmlspecialchars($notes) ?></textarea>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-lg p-5">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-800">Savdo cheki</h3>
+                                <p class="text-sm text-slate-500">Mahsulot sonini + va − tugmalari orqali boshqaring.</p>
+                            </div>
+                            <div class="text-right text-sm text-slate-500">
+                                <p>Umumiy summa</p>
+                                <p class="text-lg font-semibold text-slate-800"><span id="cart-total">0</span> so'm</p>
+                            </div>
+                        </div>
+                        <div class="border border-slate-200 rounded-lg">
+                            <div class="max-h-72 overflow-y-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                                        <tr class="text-left">
+                                            <th class="px-3 py-2">Mahsulot</th>
+                                            <th class="px-3 py-2 text-center">Soni</th>
+                                            <th class="px-3 py-2 text-right">Narx</th>
+                                            <th class="px-3 py-2 text-right">Jami</th>
+                                            <th class="px-3 py-2 text-center">O'chirish</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cart-items" class="divide-y divide-slate-100"></tbody>
+                                </table>
+                                <div id="empty-cart" class="px-4 py-6 text-center text-sm text-slate-500">
+                                    Mahsulot tanlang va savdo cheki shu yerda ko'rinadi.
                                 </div>
                             </div>
                         </div>
+                        <p class="text-xs text-slate-500 mt-3">Narxlar avtomatik ravishda mahsulot kartasidagi standart narxdan olinadi.</p>
                     </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <section class="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
-                            <h4 class="text-sm font-semibold text-slate-700 uppercase">Customer & debt tracking</h4>
-                            <p class="text-xs text-slate-500">Only required when an outstanding balance remains. Keep walk-in cash sales as-is.</p>
+                    <div class="bg-white border border-slate-200 rounded-lg p-5">
+                        <h3 class="text-base font-semibold text-slate-800 mb-3">To'lov va mijoz</h3>
+                        <p class="text-sm text-slate-500 mb-4">Qaysi usulda to'lov qabul qilinganini belgilang. Qarz savdosi uchun mijozni kiriting.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" id="payment-options">
+                            <label class="payment-card <?= $currentMode === 'cash' ? 'active' : '' ?>">
+                                <input type="radio" name="payment_mode" value="cash" <?= $currentMode === 'cash' ? 'checked' : '' ?>>
+                                <span>
+                                    <span class="block font-semibold">Naqd</span>
+                                    <span class="block text-xs">To'liq naqd to'lov</span>
+                                </span>
+                            </label>
+                            <label class="payment-card <?= $currentMode === 'click' ? 'active' : '' ?>">
+                                <input type="radio" name="payment_mode" value="click" <?= $currentMode === 'click' ? 'checked' : '' ?>>
+                                <span>
+                                    <span class="block font-semibold">Click</span>
+                                    <span class="block text-xs">To'liq raqamli to'lov</span>
+                                </span>
+                            </label>
+                            <label class="payment-card <?= $currentMode === 'debt' ? 'active' : '' ?>">
+                                <input type="radio" name="payment_mode" value="debt" <?= $currentMode === 'debt' ? 'checked' : '' ?>>
+                                <span>
+                                    <span class="block font-semibold">Qarz</span>
+                                    <span class="block text-xs">To'lov keyin olinadi</span>
+                                </span>
+                            </label>
+                        </div>
+                        <div id="debt-fields" class="<?= $currentMode === 'debt' ? '' : 'hidden' ?> space-y-3">
                             <div>
-                                <label class="block text-sm font-medium text-slate-700">Customer</label>
+                                <label class="block text-sm font-medium text-slate-700">Mavjud mijoz</label>
                                 <select name="customer_id" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
-                                    <option value="0">Walk-in</option>
+                                    <option value="0">Tanlanmagan</option>
                                     <?php foreach ($customers as $customer): ?>
-                                        <option value="<?= (int)$customer['id'] ?>" <?= isset($_POST['customer_id']) && (int)$_POST['customer_id'] === (int)$customer['id'] ? 'selected' : '' ?>><?= htmlspecialchars($customer['name']) ?></option>
+                                        <option value="<?= (int)$customer['id'] ?>" <?= $selectedCustomerId === (int)$customer['id'] ? 'selected' : '' ?>><?= htmlspecialchars($customer['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700">New customer name</label>
-                                <input type="text" name="new_customer" value="<?= htmlspecialchars($_POST['new_customer'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Add if customer is new">
+                                <label class="block text-sm font-medium text-slate-700">Yangi mijoz ismi</label>
+                                <input type="text" name="new_customer" value="<?= htmlspecialchars($newCustomerName) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Masalan, Azizbek">
+                                <p class="text-xs text-slate-500 mt-1">Agar mijoz ro'yxatda bo'lmasa, shu yerga kiriting.</p>
                             </div>
-                        </section>
-                        <section class="bg-white border border-slate-200 rounded-lg p-4 space-y-4">
-                            <div>
-                                <h4 class="text-sm font-semibold text-slate-700 uppercase">Payment</h4>
-                                <p class="text-xs text-slate-500">Choose how this sale is paid. Totals update automatically.</p>
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <label class="payment-card <?= $currentMode === 'full_cash' ? 'active' : '' ?>">
-                                    <input type="radio" name="payment_mode" value="full_cash" <?= $currentMode === 'full_cash' ? 'checked' : '' ?>>
-                                    <div>
-                                        <p class="font-semibold text-slate-800">Paid in cash</p>
-                                        <p class="text-xs text-slate-500">Full amount collected now.</p>
-                                    </div>
-                                </label>
-                                <label class="payment-card <?= $currentMode === 'full_click' ? 'active' : '' ?>">
-                                    <input type="radio" name="payment_mode" value="full_click" <?= $currentMode === 'full_click' ? 'checked' : '' ?>>
-                                    <div>
-                                        <p class="font-semibold text-slate-800">Paid via Click</p>
-                                        <p class="text-xs text-slate-500">Full amount paid digitally.</p>
-                                    </div>
-                                </label>
-                                <label class="payment-card <?= $currentMode === 'partial' ? 'active' : '' ?>">
-                                    <input type="radio" name="payment_mode" value="partial" <?= $currentMode === 'partial' ? 'checked' : '' ?>>
-                                    <div>
-                                        <p class="font-semibold text-slate-800">Partial payment</p>
-                                        <p class="text-xs text-slate-500">Collect a portion now, rest later.</p>
-                                    </div>
-                                </label>
-                                <label class="payment-card <?= $currentMode === 'debt' ? 'active' : '' ?>">
-                                    <input type="radio" name="payment_mode" value="debt" <?= $currentMode === 'debt' ? 'checked' : '' ?>>
-                                    <div>
-                                        <p class="font-semibold text-slate-800">Record as debt</p>
-                                        <p class="text-xs text-slate-500">No payment today, track balance.</p>
-                                    </div>
-                                </label>
-                            </div>
-                            <div id="partial-fields" class="grid grid-cols-1 sm:grid-cols-3 gap-3 <?= $currentMode === 'partial' ? '' : 'hidden' ?>">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Paid now (so'm)</label>
-                                    <input type="number" step="0.01" min="0" name="partial_amount" value="<?= htmlspecialchars($_POST['partial_amount'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Method</label>
-                                    <select name="partial_method" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
-                                        <option value="cash" <?= (($_POST['partial_method'] ?? '') === 'cash') ? 'selected' : '' ?>>Cash</option>
-                                        <option value="click" <?= (($_POST['partial_method'] ?? '') === 'click') ? 'selected' : '' ?>>Click</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Payment date</label>
-                                    <input type="date" name="partial_date" value="<?= htmlspecialchars($_POST['partial_date'] ?? ($_POST['sale_date'] ?? date('Y-m-d'))) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
-                                </div>
-                            </div>
-                            <div class="bg-slate-50 border border-slate-200 rounded-md px-3 py-3 text-sm space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-slate-500">Items in cart</span>
-                                    <span class="font-semibold text-slate-800" id="item-count">0</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-slate-500">Collect now</span>
-                                    <span class="font-semibold text-emerald-600" id="payment-preview">0 so'm</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-slate-500">Balance left</span>
-                                    <span class="font-semibold text-rose-600" id="balance-preview">0 so'm</span>
-                                </div>
-                            </div>
-                        </section>
+                        </div>
+                        <div class="pt-4 mt-4 border-t border-slate-200 flex items-center justify-between">
+                            <div class="text-sm text-slate-500">Barcha summalar o'zbek so'mida hisoblanadi.</div>
+                            <button type="submit" class="inline-flex items-center justify-center bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-slate-800">Savdoni saqlash</button>
+                        </div>
                     </div>
-
-                    <div class="pt-2 flex items-center justify-end">
-                        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-emerald-500">
-                            Save sale
-                        </button>
-                    </div>
-                </form>
-            </section>
-            <aside class="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
-                <div>
-                    <h3 class="text-lg font-semibold text-slate-800">Quick add products</h3>
-                    <p class="text-sm text-slate-500">Tap an item to add it instantly. Quantities grow when tapped again.</p>
-                </div>
-                <div>
-                    <label class="text-xs uppercase text-slate-500">Search catalog</label>
-                    <input type="text" id="product-search" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Start typing to filter">
-                </div>
-                <div id="product-catalog" class="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
-                    <?php foreach ($products as $product): ?>
-                        <?php $available = $stockLevels[$product['id']] ?? 0; ?>
-                        <button type="button"
-                                class="catalog-card"
-                                data-product='<?= htmlspecialchars(json_encode([
-                                    'id' => (int)$product['id'],
-                                    'name' => $product['name'],
-                                    'unit' => $product['unit'],
-                                    'price' => (float)$product['default_price'],
-                                    'stock' => (float)$available,
-                                ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>'>
-                            <div class="flex items-center justify-between">
-                                <span class="font-medium text-slate-800"><?= htmlspecialchars($product['name']) ?></span>
-                                <span class="text-sm text-emerald-600"><?= number_format((float)$product['default_price'], 2) ?> so'm</span>
-                            </div>
-                            <p class="text-xs text-slate-500">Stock: <?= number_format($available, 2) ?> <?= htmlspecialchars($product['unit']) ?></p>
-                        </button>
-                    <?php endforeach; ?>
-                </div>
-            </aside>
-        </div>
+                </section>
+            </div>
+        </form>
     <?php endif; ?>
 </div>
-
-<style>
-    .payment-card {
-        display: flex;
-        gap: 0.75rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        padding: 0.75rem;
-        cursor: pointer;
-        font-size: 0.875rem;
-        align-items: flex-start;
-        transition: all 0.2s ease;
-        background-color: #f8fafc;
-    }
-    .payment-card input[type="radio"] {
-        display: none;
-    }
-    .payment-card:hover {
-        border-color: #34d399;
-    }
-    .payment-card.active {
-        border-color: #34d399;
-        background-color: #ecfdf5;
-        box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
-    }
-    .catalog-card {
-        width: 100%;
-        text-align: left;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        padding: 0.75rem;
-        transition: all 0.2s ease;
-        background-color: #ffffff;
-    }
-    .catalog-card:hover {
-        border-color: #34d399;
-        background-color: #ecfdf5;
-    }
-</style>
-
+<?php if (!empty($products)): ?>
 <script>
-const products = <?= json_encode(array_map(function ($product) use ($stockLevels) {
-    $available = (float)($stockLevels[$product['id']] ?? 0);
-    return [
-        'id' => (int)$product['id'],
-        'name' => $product['name'],
-        'price' => (float)$product['default_price'],
-        'stock' => $available,
-        'unit' => $product['unit'],
-        'label' => $product['name'] . ' (' . $product['unit'] . ' · stock ' . number_format($available, 2) . ')'
-    ];
-}, $products)); ?>;
+    document.addEventListener('DOMContentLoaded', function () {
+        const productCatalog = new Map((<?= $catalogJson ?>).map(item => [Number(item.id), item]));
+        const initialCart = (<?= $cartJson ?>);
 
-const cartBody = document.getElementById('cart-body');
-if (cartBody) {
-    let lineIndex = <?= count($oldItems) ?>;
+        const cart = new Map();
+        const cartTableBody = document.getElementById('cart-items');
+        const cartTotalEl = document.getElementById('cart-total');
+        const emptyCartNotice = document.getElementById('empty-cart');
+        const payloadInput = document.getElementById('cart-payload');
+        const productButtons = new Map();
+        const formatter = new Intl.NumberFormat('uz-UZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-    const grandTotalEl = document.getElementById('grand-total');
-    const itemCountEl = document.getElementById('item-count');
-    const paymentPreview = document.getElementById('payment-preview');
-    const balancePreview = document.getElementById('balance-preview');
+        document.querySelectorAll('.product-button').forEach(button => {
+            const id = Number(button.dataset.id);
+            productButtons.set(id, button);
+            button.addEventListener('click', () => {
+                if (button.dataset.disabled === '1') {
+                    return;
+                }
+                addToCart(id, 1);
+            });
+        });
 
-    function updatePaymentPreview(sumOverride = null) {
-        const sum = sumOverride ?? parseFloat(grandTotalEl?.textContent || '0') || 0;
-        const modeInput = document.querySelector('input[name="payment_mode"]:checked');
-        const mode = modeInput ? modeInput.value : 'full_cash';
-        let paid = 0;
-        if (mode === 'partial') {
-            const partialField = document.querySelector('input[name="partial_amount"]');
-            paid = partialField ? parseFloat(partialField.value) || 0 : 0;
-        } else if (mode === 'debt') {
-            paid = 0;
-        } else {
-            paid = sum;
-        }
-        if (paid > sum) {
-            paid = sum;
-        }
-        const balance = Math.max(sum - paid, 0);
-        if (paymentPreview) {
-            paymentPreview.textContent = `${paid.toFixed(2)} so'm`;
-        }
-        if (balancePreview) {
-            balancePreview.textContent = `${balance.toFixed(2)} so'm`;
-        }
-    }
-
-    function refreshGrandTotal() {
-        let sum = 0;
-        let count = 0;
-        cartBody.querySelectorAll('tr').forEach(row => {
-            const quantityInput = row.querySelector('.quantity');
-            const priceInput = row.querySelector('.price');
-            if (!quantityInput || !priceInput) {
+        function addToCart(productId, amount) {
+            if (!productCatalog.has(productId)) {
                 return;
             }
-            const quantity = parseFloat(quantityInput.value) || 0;
-            const price = parseFloat(priceInput.value) || 0;
-            if (quantity > 0) {
-                count += 1;
+            const product = productCatalog.get(productId);
+            const current = cart.get(productId) || { product_id: productId, quantity: 0 };
+            const newQuantity = current.quantity + amount;
+            if (newQuantity <= 0) {
+                cart.delete(productId);
+                renderCart();
+                return;
             }
-            const total = quantity * price;
-            const lineTotal = row.querySelector('.line-total');
-            if (lineTotal) {
-                lineTotal.textContent = total.toFixed(2);
+            if (product.stock > 0 && newQuantity > product.stock + 0.0001) {
+                alert('Omborda yetarli mahsulot yo\'q.');
+                return;
             }
-            sum += total;
-        });
-        if (grandTotalEl) {
-            grandTotalEl.textContent = sum.toFixed(2);
+            cart.set(productId, { product_id: productId, quantity: newQuantity });
+            renderCart();
         }
-        if (itemCountEl) {
-            itemCountEl.textContent = count;
-        }
-        updatePaymentPreview(sum);
-    }
 
-    function bindRowEvents(row) {
-        row.addEventListener('input', event => {
-            if (event.target.matches('.quantity, .price')) {
-                refreshGrandTotal();
+        function setQuantity(productId, quantity) {
+            if (!productCatalog.has(productId)) {
+                return;
             }
-        });
-        row.addEventListener('change', event => {
-            if (event.target.matches('select')) {
-                const option = event.target.selectedOptions[0];
-                const priceInput = row.querySelector('.price');
-                const quantityInput = row.querySelector('.quantity');
-                if (option) {
-                    const price = parseFloat(option.dataset.price || '0');
-                    const stock = parseFloat(option.dataset.stock || '0');
-                    if (priceInput && !priceInput.value) {
-                        priceInput.value = price.toFixed(2);
-                    }
-                    if (quantityInput) {
-                        quantityInput.max = stock > 0 ? stock : '';
-                        quantityInput.placeholder = stock > 0 ? `Max ${stock}` : '';
-                    }
+            const product = productCatalog.get(productId);
+            if (quantity <= 0) {
+                cart.delete(productId);
+            } else if (product.stock > 0 && quantity > product.stock + 0.0001) {
+                alert('Omborda yetarli mahsulot yo\'q.');
+                return;
+            } else {
+                cart.set(productId, { product_id: productId, quantity: quantity });
+            }
+            renderCart();
+        }
+
+        function removeItem(productId) {
+            cart.delete(productId);
+            renderCart();
+        }
+
+        function renderCart() {
+            cartTableBody.innerHTML = '';
+            let total = 0;
+            cart.forEach((item, productId) => {
+                if (!productCatalog.has(productId)) {
+                    return;
                 }
-                refreshGrandTotal();
+                const product = productCatalog.get(productId);
+                const lineTotal = item.quantity * product.price;
+                total += lineTotal;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-3 py-2 text-slate-700">
+                        <div class="font-medium">${product.name}</div>
+                        <div class="text-xs text-slate-500">${formatter.format(product.price)} so'm · ${product.unit}</div>
+                    </td>
+                    <td class="px-3 py-2">
+                        <div class="flex items-center justify-center gap-2">
+                            <button type="button" class="h-7 w-7 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-slate-100" data-action="decrease" data-id="${productId}">−</button>
+                            <span class="min-w-[2.5rem] text-center font-semibold">${item.quantity}</span>
+                            <button type="button" class="h-7 w-7 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-slate-100" data-action="increase" data-id="${productId}">+</button>
+                        </div>
+                    </td>
+                    <td class="px-3 py-2 text-right text-slate-600">${formatter.format(product.price)} so'm</td>
+                    <td class="px-3 py-2 text-right font-semibold text-slate-800">${formatter.format(lineTotal)} so'm</td>
+                    <td class="px-3 py-2 text-center">
+                        <button type="button" class="text-rose-600 text-sm" data-action="remove" data-id="${productId}">O'chirish</button>
+                    </td>
+                `;
+                cartTableBody.appendChild(row);
+            });
+
+            cartTotalEl.textContent = formatter.format(total);
+            emptyCartNotice.classList.toggle('hidden', cart.size > 0);
+            payloadInput.value = JSON.stringify(Array.from(cart.values()));
+
+            productButtons.forEach((button, productId) => {
+                const badge = button.querySelector('[data-selected-pill]');
+                if (!badge) {
+                    return;
+                }
+                const countEl = badge.querySelector('[data-selected-count]');
+                const quantity = cart.get(productId)?.quantity ?? 0;
+                if (quantity > 0) {
+                    badge.classList.remove('hidden');
+                    countEl.textContent = quantity;
+                } else {
+                    badge.classList.add('hidden');
+                }
+            });
+        }
+
+        cartTableBody.addEventListener('click', (event) => {
+            const target = event.target.closest('[data-action]');
+            if (!target) {
+                return;
             }
-            if (event.target.matches('.quantity, .price')) {
-                refreshGrandTotal();
+            const productId = Number(target.dataset.id);
+            const action = target.dataset.action;
+            if (!productId) {
+                return;
+            }
+            if (action === 'increase') {
+                addToCart(productId, 1);
+            } else if (action === 'decrease') {
+                addToCart(productId, -1);
+            } else if (action === 'remove') {
+                removeItem(productId);
             }
         });
-        const removeButton = row.querySelector('.remove-line');
-        removeButton?.addEventListener('click', () => {
-            row.remove();
-            refreshGrandTotal();
+
+        if (Array.isArray(initialCart)) {
+            initialCart.forEach(entry => {
+                const productId = Number(entry.product_id ?? 0);
+                const quantity = Number(entry.quantity ?? 0);
+                if (productId && quantity > 0) {
+                    setQuantity(productId, quantity);
+                }
+            });
+        }
+
+        renderCart();
+
+        const saleForm = document.getElementById('sale-form');
+        saleForm.addEventListener('submit', () => {
+            payloadInput.value = JSON.stringify(Array.from(cart.values()));
         });
-    }
 
-    function createRow(preset = null) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td class="px-3 py-2">
-                <select name="items[${lineIndex}][product_id]" class="w-full border border-slate-300 rounded-md px-2 py-2 text-sm" required>
-                    <option value="">Select</option>
-                    ${products.map(p => `<option value="${p.id}" data-price="${p.price}" data-stock="${p.stock}">${p.label}</option>`).join('')}
-                </select>
-            </td>
-            <td class="px-3 py-2">
-                <input type="number" step="0.01" min="0" name="items[${lineIndex}][quantity]" class="w-full border border-slate-300 rounded-md px-2 py-2 text-sm quantity" value="${preset ? 1 : ''}" required>
-            </td>
-            <td class="px-3 py-2">
-                <input type="number" step="0.01" min="0" name="items[${lineIndex}][unit_price]" class="w-full border border-slate-300 rounded-md px-2 py-2 text-sm price" value="${preset ? preset.price.toFixed(2) : ''}" required>
-            </td>
-            <td class="px-3 py-2 text-slate-700"><span class="line-total">0.00</span> so'm</td>
-            <td class="px-3 py-2 text-center">
-                <button type="button" class="text-rose-600 remove-line">Remove</button>
-            </td>`;
-        cartBody.appendChild(tr);
-        const select = tr.querySelector('select');
-        if (preset) {
-            select.value = String(preset.id);
-            const quantityInput = tr.querySelector('.quantity');
-            if (quantityInput) {
-                quantityInput.max = preset.stock > 0 ? preset.stock : '';
-                quantityInput.placeholder = preset.stock > 0 ? `Max ${preset.stock}` : '';
+        const paymentOptions = document.getElementById('payment-options');
+        const debtFields = document.getElementById('debt-fields');
+        paymentOptions.addEventListener('change', (event) => {
+            const selected = event.target.closest('label');
+            if (!selected) {
+                return;
             }
-        }
-        bindRowEvents(tr);
-        if (preset) {
-            select.dispatchEvent(new Event('change'));
-        }
-        lineIndex++;
-        refreshGrandTotal();
-    }
-
-    cartBody.querySelectorAll('tr').forEach(row => bindRowEvents(row));
-    refreshGrandTotal();
-
-    const addLineButton = document.getElementById('add-line');
-    addLineButton?.addEventListener('click', () => {
-        createRow();
-    });
-
-    const catalog = document.getElementById('product-catalog');
-    catalog?.addEventListener('click', event => {
-        const button = event.target.closest('button[data-product]');
-        if (!button) {
-            return;
-        }
-        const data = JSON.parse(button.dataset.product);
-        const existing = Array.from(cartBody.querySelectorAll('select')).find(select => parseInt(select.value, 10) === data.id);
-        if (existing) {
-            const row = existing.closest('tr');
-            const quantityInput = row.querySelector('.quantity');
-            if (quantityInput) {
-                const current = parseFloat(quantityInput.value) || 0;
-                quantityInput.value = (current + 1).toFixed(2);
-                refreshGrandTotal();
+            paymentOptions.querySelectorAll('.payment-card').forEach(card => card.classList.remove('active'));
+            selected.classList.add('active');
+            const mode = selected.querySelector('input').value;
+            if (mode === 'debt') {
+                debtFields.classList.remove('hidden');
+            } else {
+                debtFields.classList.add('hidden');
             }
-            existing.dispatchEvent(new Event('change'));
-        } else {
-            createRow(data);
-        }
-    });
-
-    const searchInput = document.getElementById('product-search');
-    searchInput?.addEventListener('input', () => {
-        const term = searchInput.value.toLowerCase();
-        catalog?.querySelectorAll('button[data-product]').forEach(button => {
-            const info = JSON.parse(button.dataset.product);
-            const matches = info.name.toLowerCase().includes(term);
-            button.classList.toggle('hidden', !matches);
         });
     });
-
-    const paymentRadios = document.querySelectorAll('input[name="payment_mode"]');
-    paymentRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            document.querySelectorAll('.payment-card').forEach(card => card.classList.remove('active'));
-            const card = radio.closest('.payment-card');
-            if (card) {
-                card.classList.add('active');
-            }
-            const partialBox = document.getElementById('partial-fields');
-            if (partialBox) {
-                partialBox.classList.toggle('hidden', radio.value !== 'partial');
-            }
-            refreshGrandTotal();
-        });
-    });
-
-    const partialAmountInput = document.querySelector('input[name="partial_amount"]');
-    partialAmountInput?.addEventListener('input', () => refreshGrandTotal());
-}
 </script>
+<?php endif; ?>
 <?php
 render_footer();
 ?>

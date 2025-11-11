@@ -65,7 +65,7 @@ if ($saleId) {
     }
 }
 
-render_header('Receipts');
+render_header('Cheklar');
 ?>
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">

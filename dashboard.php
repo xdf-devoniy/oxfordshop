@@ -39,47 +39,47 @@ $latestSales = fetchAll($pdo, 'SELECT s.id, s.sale_date, s.total_amount,
     ORDER BY s.sale_date DESC, s.id DESC
     LIMIT 5');
 
-render_header('Dashboard');
+render_header('Boshqaruv paneli');
 ?>
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
     <div class="bg-white border border-slate-200 rounded-lg p-5">
-        <p class="text-sm text-slate-500">Total Products</p>
+        <p class="text-sm text-slate-500">Mahsulotlar soni</p>
         <p class="text-3xl font-semibold text-slate-900"><?= number_format((float)$totalProducts) ?></p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-5">
-        <p class="text-sm text-slate-500">Total Customers</p>
+        <p class="text-sm text-slate-500">Mijozlar soni</p>
         <p class="text-3xl font-semibold text-slate-900"><?= number_format((float)$totalCustomers) ?></p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-5">
-        <p class="text-sm text-slate-500">Revenue To Date</p>
+        <p class="text-sm text-slate-500">Umumiy tushum</p>
         <p class="text-3xl font-semibold text-emerald-600"><?= number_format((float)$totalRevenue, 2) ?> so'm</p>
     </div>
     <div class="bg-white border border-slate-200 rounded-lg p-5">
-        <p class="text-sm text-slate-500">Outstanding Debt</p>
+        <p class="text-sm text-slate-500">Qarzdorlik</p>
         <p class="text-3xl font-semibold text-rose-600"><?= number_format((float)$outstanding, 2) ?> so'm</p>
     </div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Recent Sales</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">So'nggi savdolar</h3>
         <div class="overflow-x-auto">
             <div class="max-h-[22rem] overflow-y-auto">
                 <table class="min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-slate-500 uppercase text-xs">
-                        <th class="pb-2">Receipt #</th>
-                        <th class="pb-2">Date</th>
-                        <th class="pb-2">Customer</th>
-                        <th class="pb-2">Total</th>
-                        <th class="pb-2">Paid</th>
-                        <th class="pb-2">Balance</th>
+                        <th class="pb-2">Chek №</th>
+                        <th class="pb-2">Sana</th>
+                        <th class="pb-2">Mijoz</th>
+                        <th class="pb-2">Jami</th>
+                        <th class="pb-2">To'langan</th>
+                        <th class="pb-2">Qoldiq</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     <?php if (empty($latestSales)): ?>
                         <tr>
-                            <td colspan="6" class="py-6 text-center text-slate-400">No sales recorded yet.</td>
+                            <td colspan="6" class="py-6 text-center text-slate-400">Hali savdolar kiritilmagan.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($latestSales as $sale):
@@ -101,16 +101,16 @@ render_header('Dashboard');
         </div>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Inventory Snapshot</h3>
-        <p class="text-sm text-slate-500 mb-2">Total units in stock: <span class="font-semibold text-slate-700"><?= number_format($totalStockItems, 2) ?></span></p>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Ombor holati</h3>
+        <p class="text-sm text-slate-500 mb-2">Ombordagi jami birliklar: <span class="font-semibold text-slate-700"><?= number_format($totalStockItems, 2) ?></span></p>
         <div class="space-y-2">
             <?php if (empty($lowStock)): ?>
-                <p class="text-sm text-slate-500">All products have healthy stock levels.</p>
+                <p class="text-sm text-slate-500">Barcha mahsulotlarda zaxira yetarli.</p>
             <?php else: ?>
                 <?php foreach ($lowStock as $item): ?>
                     <div class="border border-amber-200 bg-amber-50 rounded-md px-3 py-2">
                         <p class="text-sm font-medium text-amber-900"><?= htmlspecialchars($item['name']) ?></p>
-                        <p class="text-xs text-amber-700">Remaining: <?= number_format((float)$item['stock'], 2) ?> <?= htmlspecialchars($item['unit']) ?></p>
+                        <p class="text-xs text-amber-700">Qoldiq: <?= number_format((float)$item['stock'], 2) ?> <?= htmlspecialchars($item['unit']) ?></p>
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
@@ -120,30 +120,30 @@ render_header('Dashboard');
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Cashflow</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Pul oqimi</h3>
         <dl class="space-y-2 text-sm">
             <div class="flex justify-between">
-                <dt class="text-slate-500">Total purchases</dt>
+                <dt class="text-slate-500">Jami xaridlar</dt>
                 <dd class="text-slate-700"><?= number_format((float)$totalPurchases, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-slate-500">Payments received</dt>
+                <dt class="text-slate-500">Qabul qilingan to'lovlar</dt>
                 <dd class="text-emerald-600 font-medium"><?= number_format((float)$totalPayments, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-slate-500">Outstanding balance</dt>
+                <dt class="text-slate-500">Qarzdorlik qoldig'i</dt>
                 <dd class="text-rose-600 font-medium"><?= number_format((float)$outstanding, 2) ?> so'm</dd>
             </div>
         </dl>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Guided Workflow</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Ish jarayoni bo'yicha yo'riqnoma</h3>
         <ol class="space-y-3 text-sm text-slate-600">
-            <li><span class="font-semibold text-slate-800">1.</span> Create or update products with their default selling prices.</li>
-            <li><span class="font-semibold text-slate-800">2.</span> Log purchases whenever you restock from suppliers.</li>
-            <li><span class="font-semibold text-slate-800">3.</span> Record sales, capture immediate payments, or leave balances as debt.</li>
-            <li><span class="font-semibold text-slate-800">4.</span> Track receipts to add follow-up payments and monitor debtors.</li>
-            <li><span class="font-semibold text-slate-800">5.</span> Review reports and profit dashboards to stay profitable.</li>
+            <li><span class="font-semibold text-slate-800">1.</span> Mahsulotlarni narxlari bilan kiriting yoki yangilang.</li>
+            <li><span class="font-semibold text-slate-800">2.</span> Yetkazib beruvchilardan olgan har bir partiyani xarid sifatida kiriting.</li>
+            <li><span class="font-semibold text-slate-800">3.</span> Savdolarni yozib boring, to'lovni darhol qabul qiling yoki qarzga qoldiring.</li>
+            <li><span class="font-semibold text-slate-800">4.</span> Cheklar bo'limida qo'shimcha to'lovlarni kiriting va qarzdorlarni kuzating.</li>
+            <li><span class="font-semibold text-slate-800">5.</span> Hisobot va foyda paneli orqali natijalarni tahlil qiling.</li>
         </ol>
     </section>
 </div>

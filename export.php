@@ -76,7 +76,7 @@ if ($type === 'debtors') {
     ], $rows), 'debtors.csv');
 }
 
-render_header('Exports');
+render_header('Eksport');
 ?>
 <div class="bg-white border border-slate-200 rounded-lg p-6">
     <h3 class="text-lg font-semibold text-slate-800 mb-4">Download CSV Backups</h3>

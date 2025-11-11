@@ -75,7 +75,7 @@ $stockOnHand = fetchAll($pdo, 'SELECT p.id, p.name, p.unit, p.default_price,
     FROM products p
     ORDER BY p.name');
 
-render_header('Reports');
+render_header('Hisobotlar');
 ?>
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
     <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
