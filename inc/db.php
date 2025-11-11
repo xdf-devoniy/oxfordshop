@@ -88,6 +88,16 @@ function runMigrations(PDO $pdo): void
         FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
     )');
 
+    $pdo->exec('CREATE TABLE IF NOT EXISTS receipt_audits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_id INTEGER NOT NULL,
+        field TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(sale_id) REFERENCES sales(id) ON DELETE CASCADE
+    )');
+
     $pdo->exec('CREATE INDEX IF NOT EXISTS idx_purchases_product ON purchases(product_id)');
     $pdo->exec('CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)');
     $pdo->exec('CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');

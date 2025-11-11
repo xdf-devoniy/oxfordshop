@@ -10,12 +10,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $notes = trim($_POST['notes'] ?? '');
 
     if ($name === '') {
-        $errors[] = 'Customer name is required.';
+        $errors[] = 'Mijoz ismini kiriting.';
     }
 
     if (empty($errors)) {
         execute($pdo, 'INSERT INTO customers (name, phone, notes) VALUES (?, ?, ?)', [$name, $phone ?: null, $notes ?: null]);
-        $success = 'Customer added successfully.';
+        $success = 'Mijoz muvaffaqiyatli qo\'shildi.';
     }
 }
 
@@ -70,20 +70,20 @@ render_header('Qarzdorlar');
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-slate-800">Customers with Outstanding Balances</h3>
+            <h3 class="text-lg font-semibold text-slate-800">Qarzdor mijozlar</h3>
             <?php if ($walkInOutstanding > 0): ?>
-                <span class="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded-full">Walk-in debt: <?= number_format($walkInOutstanding, 2) ?> so'm</span>
+                <span class="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded-full">Tasodifiy mijozlar qarzi: <?= number_format($walkInOutstanding, 2) ?> so'm</span>
             <?php endif; ?>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-xs uppercase text-slate-500">
-                        <th class="pb-2">Customer</th>
-                        <th class="pb-2">Phone</th>
-                        <th class="pb-2">Total Sold</th>
-                        <th class="pb-2">Paid</th>
-                        <th class="pb-2">Balance</th>
+                        <th class="pb-2">Mijoz</th>
+                        <th class="pb-2">Telefon</th>
+                        <th class="pb-2">Savdolar</th>
+                        <th class="pb-2">To'langan</th>
+                        <th class="pb-2">Qoldiq</th>
                         <th class="pb-2">0-7</th>
                         <th class="pb-2">8-30</th>
                         <th class="pb-2">30+</th>
@@ -92,7 +92,7 @@ render_header('Qarzdorlar');
                 <tbody class="divide-y divide-slate-100">
                     <?php if (empty($customerBalances)): ?>
                         <tr>
-                            <td colspan="8" class="py-6 text-center text-slate-400">No outstanding balances. Great job!</td>
+                            <td colspan="8" class="py-6 text-center text-slate-400">Qarzdor mijozlar yo'q. Ajoyib!</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($customerBalances as $customer):
@@ -118,7 +118,7 @@ render_header('Qarzdorlar');
         </div>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Add Customer</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Mijoz qo'shish</h3>
         <?php if (!empty($errors)): ?>
             <div class="mb-4 border border-rose-200 bg-rose-50 text-rose-700 text-sm px-3 py-2 rounded">
                 <ul class="list-disc pl-4">
@@ -134,19 +134,19 @@ render_header('Qarzdorlar');
         <?php endif; ?>
         <form method="post" class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-700">Customer name</label>
+                <label class="block text-sm font-medium text-slate-700">Mijoz ismi</label>
                 <input type="text" name="name" value="<?= htmlspecialchars($_POST['name'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Phone</label>
-                <input type="text" name="phone" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Optional">
+                <label class="block text-sm font-medium text-slate-700">Telefon</label>
+                <input type="text" name="phone" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Ixtiyoriy">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Notes</label>
-                <textarea name="notes" rows="3" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Favorite drinks, payment terms, etc."><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
+                <label class="block text-sm font-medium text-slate-700">Izoh</label>
+                <textarea name="notes" rows="3" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Masalan: sevimli mahsulotlar, to'lov shartlari."><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
             </div>
             <div class="pt-2">
-                <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800">Save customer</button>
+                <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800">Mijozni saqlash</button>
             </div>
         </form>
     </section>

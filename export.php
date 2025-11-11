@@ -21,17 +21,17 @@ if ($type === 'purchases') {
         FROM purchases pu
         JOIN products pr ON pr.id = pu.product_id
         ORDER BY pu.purchase_date DESC');
-    streamCsv(['ID', 'Date', 'Product', 'Quantity', 'Unit Cost', 'Total'], array_map(fn($row) => [
+    streamCsv(['ID', 'Sana', 'Mahsulot', 'Miqdor', 'Tannarx', 'Jami'], array_map(fn($row) => [
         $row['id'], $row['purchase_date'], $row['name'], $row['quantity'], $row['unit_cost'], $row['total']
     ], $rows), 'purchases.csv');
 }
 
 if ($type === 'sales') {
-    $rows = fetchAll($pdo, 'SELECT s.id, s.sale_date, IFNULL(c.name, "Walk-in") AS customer, s.total_amount
+    $rows = fetchAll($pdo, 'SELECT s.id, s.sale_date, IFNULL(c.name, "Tasodifiy mijoz") AS customer, s.total_amount
         FROM sales s
         LEFT JOIN customers c ON c.id = s.customer_id
         ORDER BY s.sale_date DESC');
-    streamCsv(['Receipt', 'Date', 'Customer', 'Total Amount'], array_map(fn($row) => [
+    streamCsv(['Chek', 'Sana', 'Mijoz', 'Umumiy summa'], array_map(fn($row) => [
         $row['id'], $row['sale_date'], $row['customer'], $row['total_amount']
     ], $rows), 'sales.csv');
 }
@@ -40,7 +40,7 @@ if ($type === 'payments') {
     $rows = fetchAll($pdo, 'SELECT p.id, p.sale_id, p.payment_method, p.amount, p.payment_date
         FROM payments p
         ORDER BY p.payment_date DESC');
-    streamCsv(['Payment ID', 'Sale ID', 'Method', 'Amount', 'Date'], array_map(fn($row) => [
+    streamCsv(['To\'lov ID', 'Savdo ID', 'Usul', 'Summa', 'Sana'], array_map(fn($row) => [
         $row['id'], $row['sale_id'], strtoupper($row['payment_method']), $row['amount'], $row['payment_date']
     ], $rows), 'payments.csv');
 }
@@ -53,13 +53,13 @@ if ($type === 'stock') {
         p.unit, p.default_price
         FROM products p
         ORDER BY p.name');
-    streamCsv(['Product', 'Stock', 'Unit', 'Default Price'], array_map(fn($row) => [
+    streamCsv(['Mahsulot', 'Qoldiq', 'O\'lchov', 'Standart narx'], array_map(fn($row) => [
         $row['name'], $row['stock'], $row['unit'], $row['default_price']
     ], $rows), 'stock.csv');
 }
 
 if ($type === 'debtors') {
-    $rows = fetchAll($pdo, 'SELECT IFNULL(c.name, "Walk-in") AS customer,
+    $rows = fetchAll($pdo, 'SELECT IFNULL(c.name, "Tasodifiy mijoz") AS customer,
         s.sale_date,
         s.total_amount,
         IFNULL(pay.total_paid,0) AS paid,
@@ -71,7 +71,7 @@ if ($type === 'debtors') {
         ) pay ON pay.sale_id = s.id
         WHERE s.total_amount > IFNULL(pay.total_paid,0)
         ORDER BY s.sale_date DESC');
-    streamCsv(['Customer', 'Date', 'Total', 'Paid', 'Balance'], array_map(fn($row) => [
+    streamCsv(['Mijoz', 'Sana', 'Jami', 'To\'langan', 'Qoldiq'], array_map(fn($row) => [
         $row['customer'], $row['sale_date'], $row['total_amount'], $row['paid'], $row['balance']
     ], $rows), 'debtors.csv');
 }
@@ -79,28 +79,28 @@ if ($type === 'debtors') {
 render_header('Eksport');
 ?>
 <div class="bg-white border border-slate-200 rounded-lg p-6">
-    <h3 class="text-lg font-semibold text-slate-800 mb-4">Download CSV Backups</h3>
-    <p class="text-sm text-slate-500 mb-6">Export raw data for external analysis or archiving. Files are generated instantly from the SQLite database.</p>
+    <h3 class="text-lg font-semibold text-slate-800 mb-4">CSV ko'chirmalarni yuklab oling</h3>
+    <p class="text-sm text-slate-500 mb-6">Ma'lumotlarni tashqi tahlil yoki zahira nusxa uchun eksport qiling. Fayllar darhol SQLite bazasidan shakllantiriladi.</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <a href="export.php?type=purchases" class="px-4 py-3 border border-slate-300 rounded-lg flex items-center justify-between text-sm hover:border-slate-400">
-            <span>Purchases</span>
-            <span class="text-blue-600">Download</span>
+            <span>Xaridlar</span>
+            <span class="text-blue-600">Yuklab olish</span>
         </a>
         <a href="export.php?type=sales" class="px-4 py-3 border border-slate-300 rounded-lg flex items-center justify-between text-sm hover:border-slate-400">
-            <span>Sales</span>
-            <span class="text-blue-600">Download</span>
+            <span>Savdolar</span>
+            <span class="text-blue-600">Yuklab olish</span>
         </a>
         <a href="export.php?type=payments" class="px-4 py-3 border border-slate-300 rounded-lg flex items-center justify-between text-sm hover:border-slate-400">
-            <span>Payments</span>
-            <span class="text-blue-600">Download</span>
+            <span>To'lovlar</span>
+            <span class="text-blue-600">Yuklab olish</span>
         </a>
         <a href="export.php?type=stock" class="px-4 py-3 border border-slate-300 rounded-lg flex items-center justify-between text-sm hover:border-slate-400">
-            <span>Stock on hand</span>
-            <span class="text-blue-600">Download</span>
+            <span>Ombordagi qoldiq</span>
+            <span class="text-blue-600">Yuklab olish</span>
         </a>
         <a href="export.php?type=debtors" class="px-4 py-3 border border-slate-300 rounded-lg flex items-center justify-between text-sm hover:border-slate-400">
-            <span>Debtors</span>
-            <span class="text-blue-600">Download</span>
+            <span>Qarzdorlar</span>
+            <span class="text-blue-600">Yuklab olish</span>
         </a>
     </div>
 </div>

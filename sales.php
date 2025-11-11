@@ -446,6 +446,35 @@ render_header('Savdolar');
                 </section>
             </div>
         </form>
+        <div id="product-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-800" id="product-modal-name">Mahsulot</h3>
+                        <p class="text-sm text-slate-500" id="product-modal-stock"></p>
+                    </div>
+                    <button type="button" class="text-slate-500 hover:text-slate-700" data-close-product-modal>&#10005;</button>
+                </div>
+                <div class="px-5 py-4 space-y-4">
+                    <div>
+                        <p class="text-sm text-slate-500">Narx</p>
+                        <p class="text-lg font-semibold text-slate-800" id="product-modal-price">0 so'm</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-500 mb-2">Miqdor</p>
+                        <div class="flex items-center justify-center gap-4">
+                            <button type="button" id="product-modal-minus" class="h-10 w-10 rounded-full border border-slate-300 flex items-center justify-center text-lg text-slate-600 hover:bg-slate-100">−</button>
+                            <span class="text-2xl font-semibold text-slate-800" id="product-modal-qty">1</span>
+                            <button type="button" id="product-modal-plus" class="h-10 w-10 rounded-full border border-slate-300 flex items-center justify-center text-lg text-slate-600 hover:bg-slate-100">+</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+                        <button type="button" class="text-sm text-slate-500 hover:text-slate-700" data-close-product-modal>Bekor qilish</button>
+                        <button type="button" id="product-modal-confirm" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800">Savdoga qo'shish</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     <?php endif; ?>
 </div>
 <?php if (!empty($products)): ?>
@@ -469,29 +498,98 @@ render_header('Savdolar');
                 if (button.dataset.disabled === '1') {
                     return;
                 }
-                addToCart(id, 1);
+                openProductModal(id);
             });
         });
 
-        function addToCart(productId, amount) {
+        const productModal = document.getElementById('product-modal');
+        const modalName = document.getElementById('product-modal-name');
+        const modalPrice = document.getElementById('product-modal-price');
+        const modalStock = document.getElementById('product-modal-stock');
+        const modalQuantityValue = document.getElementById('product-modal-qty');
+        const modalMinus = document.getElementById('product-modal-minus');
+        const modalPlus = document.getElementById('product-modal-plus');
+        const modalConfirm = document.getElementById('product-modal-confirm');
+        const modalCloseButtons = document.querySelectorAll('[data-close-product-modal]');
+
+        let activeProductId = null;
+        let modalQuantity = 1;
+
+        const closeProductModal = () => {
+            productModal?.classList.add('hidden');
+            activeProductId = null;
+        };
+
+        modalCloseButtons.forEach(button => {
+            button.addEventListener('click', () => closeProductModal());
+        });
+
+        productModal?.addEventListener('click', (event) => {
+            if (event.target === productModal) {
+                closeProductModal();
+            }
+        });
+
+        function openProductModal(productId) {
             if (!productCatalog.has(productId)) {
                 return;
             }
+            activeProductId = productId;
             const product = productCatalog.get(productId);
-            const current = cart.get(productId) || { product_id: productId, quantity: 0 };
-            const newQuantity = current.quantity + amount;
-            if (newQuantity <= 0) {
-                cart.delete(productId);
-                renderCart();
-                return;
-            }
-            if (product.stock > 0 && newQuantity > product.stock + 0.0001) {
-                alert('Omborda yetarli mahsulot yo\'q.');
-                return;
-            }
-            cart.set(productId, { product_id: productId, quantity: newQuantity });
-            renderCart();
+            modalName.textContent = product.name;
+            modalPrice.textContent = formatter.format(product.price) + ' so\'m';
+            modalStock.textContent = product.stock > 0
+                ? `Omborda: ${formatter.format(product.stock)} ${product.unit}`
+                : 'Omborda mavjud emas';
+            const existing = cart.get(productId)?.quantity ?? 0;
+            modalQuantity = existing > 0 ? existing : 1;
+            updateModalQuantity(product);
+            productModal.classList.remove('hidden');
         }
+
+        function updateModalQuantity(product) {
+            modalQuantity = Math.max(1, Math.round(modalQuantity * 100) / 100);
+            if (product.stock > 0 && modalQuantity > product.stock) {
+                modalQuantity = product.stock;
+            }
+            modalQuantityValue.textContent = modalQuantity;
+            modalMinus.disabled = modalQuantity <= 1;
+            if (product.stock > 0) {
+                modalPlus.disabled = modalQuantity >= product.stock;
+            } else {
+                modalPlus.disabled = false;
+            }
+        }
+
+        modalMinus?.addEventListener('click', () => {
+            if (activeProductId === null) {
+                return;
+            }
+            const product = productCatalog.get(activeProductId);
+            modalQuantity = Math.max(1, modalQuantity - 1);
+            updateModalQuantity(product);
+        });
+
+        modalPlus?.addEventListener('click', () => {
+            if (activeProductId === null) {
+                return;
+            }
+            const product = productCatalog.get(activeProductId);
+            modalQuantity += 1;
+            updateModalQuantity(product);
+        });
+
+        modalConfirm?.addEventListener('click', () => {
+            if (activeProductId === null) {
+                return;
+            }
+            setQuantity(activeProductId, modalQuantity);
+            closeProductModal();
+            const badge = productButtons.get(activeProductId)?.querySelector('[data-selected-pill]');
+            if (badge) {
+                badge.classList.remove('hidden');
+            }
+        });
 
         function setQuantity(productId, quantity) {
             if (!productCatalog.has(productId)) {
@@ -578,9 +676,11 @@ render_header('Savdolar');
                 return;
             }
             if (action === 'increase') {
-                addToCart(productId, 1);
+                const current = cart.get(productId)?.quantity ?? 0;
+                setQuantity(productId, current + 1);
             } else if (action === 'decrease') {
-                addToCart(productId, -1);
+                const current = cart.get(productId)?.quantity ?? 0;
+                setQuantity(productId, current - 1);
             } else if (action === 'remove') {
                 removeItem(productId);
             }

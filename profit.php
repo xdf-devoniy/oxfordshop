@@ -123,10 +123,10 @@ $comparison = periodMetrics($pdo, $compareStart, $compareEnd);
 function trendBadge(float $current, float $previous): string
 {
     if ($previous == 0 && $current == 0) {
-        return '<span class="text-slate-500 text-xs">No change</span>';
+        return '<span class="text-slate-500 text-xs">O\'zgarish yo\'q</span>';
     }
     if ($previous == 0) {
-        return '<span class="text-emerald-600 text-xs">▲ New</span>';
+        return '<span class="text-emerald-600 text-xs">▲ Yangi</span>';
     }
     $diff = (($current - $previous) / $previous) * 100;
     if ($diff > 0) {
@@ -150,7 +150,7 @@ foreach ($current['sales_by_product'] as $row) {
     $profit = (float)$row['revenue'] - ($current['product_costs'][$row['product_id']] ?? 0);
     $product = fetchOne($pdo, 'SELECT name FROM products WHERE id = ?', [$row['product_id']]);
     $topProducts[] = [
-        'name' => $product['name'] ?? 'Unknown',
+        'name' => $product['name'] ?? 'Noma\'lum',
         'revenue' => (float)$row['revenue'],
         'profit' => $profit,
         'quantity' => (float)$row['quantity'],
@@ -165,95 +165,95 @@ render_header('Foyda paneli');
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
     <form method="get" class="flex flex-wrap gap-3 text-sm items-end">
         <div>
-            <label class="block text-slate-600">Mode</label>
+            <label class="block text-slate-600">Rejim</label>
             <select name="mode" class="mt-1 border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
-                <option value="current" <?= $mode === 'current' ? 'selected' : '' ?>>This month</option>
-                <option value="previous" <?= $mode === 'previous' ? 'selected' : '' ?>>Previous month</option>
-                <option value="custom" <?= $mode === 'custom' ? 'selected' : '' ?>>Custom range</option>
+                <option value="current" <?= $mode === 'current' ? 'selected' : '' ?>>Joriy oy</option>
+                <option value="previous" <?= $mode === 'previous' ? 'selected' : '' ?>>O'tgan oy</option>
+                <option value="custom" <?= $mode === 'custom' ? 'selected' : '' ?>>Tanlangan davr</option>
             </select>
         </div>
         <div>
-            <label class="block text-slate-600">Start</label>
+            <label class="block text-slate-600">Boshlanish</label>
             <input type="date" name="start" value="<?= htmlspecialchars($start) ?>" class="mt-1 border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
         </div>
         <div>
-            <label class="block text-slate-600">End</label>
+            <label class="block text-slate-600">Tugash</label>
             <input type="date" name="end" value="<?= htmlspecialchars($end) ?>" class="mt-1 border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
         </div>
         <div>
-            <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white rounded-md">Update</button>
+            <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white rounded-md">Yangilash</button>
         </div>
     </form>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5 lg:col-span-2">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Profitability Overview</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Foydalilik ko'rsatkichi</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div class="p-4 border border-slate-200 rounded-lg">
-                <p class="text-slate-500">Revenue</p>
+                <p class="text-slate-500">Tushum</p>
                 <p class="text-2xl font-semibold text-slate-900"><?= number_format($current['revenue'], 2) ?> so'm</p>
                 <?= trendBadge($current['revenue'], $comparison['revenue']) ?>
             </div>
             <div class="p-4 border border-slate-200 rounded-lg">
-                <p class="text-slate-500">Gross Profit</p>
+                <p class="text-slate-500">Yalpi foyda</p>
                 <p class="text-2xl font-semibold text-emerald-600"><?= number_format($current['gross_profit'], 2) ?> so'm</p>
                 <?= trendBadge($current['gross_profit'], $comparison['gross_profit']) ?>
             </div>
             <div class="p-4 border border-slate-200 rounded-lg">
-                <p class="text-slate-500">Profit Margin</p>
+                <p class="text-slate-500">Foyda marjasi</p>
                 <p class="text-2xl font-semibold text-slate-900"><?= number_format($current['margin'], 2) ?>%</p>
                 <?= trendBadge($current['margin'], $comparison['margin']) ?>
             </div>
             <div class="p-4 border border-slate-200 rounded-lg">
-                <p class="text-slate-500">Average Order Value</p>
+                <p class="text-slate-500">O'rtacha chek summasi</p>
                 <p class="text-2xl font-semibold text-slate-900"><?= number_format($current['average_order'], 2) ?> so'm</p>
                 <?= trendBadge($current['average_order'], $comparison['average_order']) ?>
             </div>
         </div>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Cash vs Click</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Naqd va Click</h3>
         <ul class="space-y-2 text-sm">
-            <li class="flex justify-between"><span class="text-slate-500">Cash collected</span><span class="text-emerald-600 font-medium"><?= number_format($current['cash'], 2) ?> so'm</span></li>
-            <li class="flex justify-between"><span class="text-slate-500">Click collected</span><span class="text-emerald-600 font-medium"><?= number_format($current['click'], 2) ?> so'm</span></li>
-            <li class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500">Collections</span><span class="text-slate-700"><?= number_format($current['collections'], 2) ?> so'm</span></li>
-            <li class="flex justify-between"><span class="text-slate-500">Closing debt</span><span class="text-rose-600 font-medium"><?= number_format($current['closing_debt'], 2) ?> so'm</span></li>
+            <li class="flex justify-between"><span class="text-slate-500">Naqd to'lovlar</span><span class="text-emerald-600 font-medium"><?= number_format($current['cash'], 2) ?> so'm</span></li>
+            <li class="flex justify-between"><span class="text-slate-500">Click to'lovlar</span><span class="text-emerald-600 font-medium"><?= number_format($current['click'], 2) ?> so'm</span></li>
+            <li class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500">Yig'imlar</span><span class="text-slate-700"><?= number_format($current['collections'], 2) ?> so'm</span></li>
+            <li class="flex justify-between"><span class="text-slate-500">Yakuniy qarz</span><span class="text-rose-600 font-medium"><?= number_format($current['closing_debt'], 2) ?> so'm</span></li>
         </ul>
     </section>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-3">Debtor Movement</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-3">Qarzdorlik harakati</h3>
         <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="text-slate-500">Opening debt</dt><dd class="text-slate-700"><?= number_format($current['opening_debt'], 2) ?> so'm</dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">Collections</dt><dd class="text-emerald-600"><?= number_format($current['collections'], 2) ?> so'm</dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">New debt</dt><dd class="text-rose-600"><?= number_format($current['new_debt'], 2) ?> so'm</dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">Closing debt</dt><dd class="text-slate-800 font-semibold"><?= number_format($current['closing_debt'], 2) ?> so'm</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Boshlang'ich qarz</dt><dd class="text-slate-700"><?= number_format($current['opening_debt'], 2) ?> so'm</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Yig'imlar</dt><dd class="text-emerald-600"><?= number_format($current['collections'], 2) ?> so'm</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Yangi qarz</dt><dd class="text-rose-600"><?= number_format($current['new_debt'], 2) ?> so'm</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Yakuniy qarz</dt><dd class="text-slate-800 font-semibold"><?= number_format($current['closing_debt'], 2) ?> so'm</dd></div>
         </dl>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-3">Units Sold</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-3">Sotilgan birliklar</h3>
         <p class="text-2xl font-semibold text-slate-900"><?= number_format($current['units'], 2) ?></p>
-        <p class="text-sm text-slate-500">Across <?= $current['orders'] ?> orders in this period.</p>
+        <p class="text-sm text-slate-500">Ushbu davrda <?= $current['orders'] ?> ta chek bo'yicha.</p>
     </section>
 </div>
 
 <div class="bg-white border border-slate-200 rounded-lg p-5 mt-6">
-    <h3 class="text-lg font-semibold text-slate-800 mb-3">Daily Trend</h3>
+    <h3 class="text-lg font-semibold text-slate-800 mb-3">Kunlik trend</h3>
     <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead>
                 <tr class="text-left text-xs uppercase text-slate-500">
-                    <th class="pb-2">Date</th>
-                    <th class="pb-2">Revenue</th>
-                    <th class="pb-2">Units</th>
+                    <th class="pb-2">Sana</th>
+                    <th class="pb-2">Tushum</th>
+                    <th class="pb-2">Birliklar</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 <?php if (empty($dailyTrend)): ?>
-                    <tr><td colspan="3" class="py-6 text-center text-slate-400">No sales in this period.</td></tr>
+                    <tr><td colspan="3" class="py-6 text-center text-slate-400">Bu davrda savdolar mavjud emas.</td></tr>
                 <?php else: ?>
                     <?php foreach ($dailyTrend as $day): ?>
                         <tr>
@@ -269,20 +269,20 @@ render_header('Foyda paneli');
 </div>
 
 <div class="bg-white border border-slate-200 rounded-lg p-5 mt-6">
-    <h3 class="text-lg font-semibold text-slate-800 mb-3">Top Products by Profit</h3>
+    <h3 class="text-lg font-semibold text-slate-800 mb-3">Foyda bo'yicha eng yaxshi mahsulotlar</h3>
     <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead>
                 <tr class="text-left text-xs uppercase text-slate-500">
-                    <th class="pb-2">Product</th>
-                    <th class="pb-2">Quantity</th>
-                    <th class="pb-2">Revenue</th>
-                    <th class="pb-2">Profit</th>
+                    <th class="pb-2">Mahsulot</th>
+                    <th class="pb-2">Miqdor</th>
+                    <th class="pb-2">Tushum</th>
+                    <th class="pb-2">Foyda</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 <?php if (empty($topProducts)): ?>
-                    <tr><td colspan="4" class="py-6 text-center text-slate-400">No profitable products to display.</td></tr>
+                    <tr><td colspan="4" class="py-6 text-center text-slate-400">Foydali mahsulotlar topilmadi.</td></tr>
                 <?php else: ?>
                     <?php foreach ($topProducts as $product): ?>
                         <tr>

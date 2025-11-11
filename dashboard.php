@@ -29,7 +29,7 @@ foreach ($stockRows as $row) {
 }
 
 $latestSales = fetchAll($pdo, 'SELECT s.id, s.sale_date, s.total_amount,
-    IFNULL(c.name, "Walk-in") AS customer,
+    IFNULL(c.name, "Tasodifiy mijoz") AS customer,
     IFNULL(paid.total_paid,0) AS total_paid
     FROM sales s
     LEFT JOIN customers c ON c.id = s.customer_id

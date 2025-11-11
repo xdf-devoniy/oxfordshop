@@ -80,90 +80,95 @@ render_header('Hisobotlar');
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
     <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
         <div>
-            <label class="block text-slate-600">Start date</label>
+            <label class="block text-slate-600">Boshlanish sanasi</label>
             <input type="date" name="start" value="<?= htmlspecialchars($start) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
         </div>
         <div>
-            <label class="block text-slate-600">End date</label>
+            <label class="block text-slate-600">Tugash sanasi</label>
             <input type="date" name="end" value="<?= htmlspecialchars($end) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
         </div>
         <div class="flex items-end">
-            <button type="submit" class="w-full md:w-auto inline-flex justify-center px-4 py-2 bg-slate-900 text-white rounded-md">Run report</button>
+            <button type="submit" class="w-full md:w-auto inline-flex justify-center px-4 py-2 bg-slate-900 text-white rounded-md">Hisobotni ko'rsatish</button>
         </div>
         <div class="flex items-end">
-            <a href="reports.php" class="w-full md:w-auto inline-flex justify-center px-4 py-2 border border-slate-300 rounded-md text-slate-600">Reset</a>
+            <a href="reports.php" class="w-full md:w-auto inline-flex justify-center px-4 py-2 border border-slate-300 rounded-md text-slate-600">Qayta tiklash</a>
         </div>
     </form>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Financial Summary</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Moliyaviy xulosa</h3>
         <dl class="space-y-2 text-sm">
             <div class="flex justify-between">
-                <dt class="text-slate-500">Revenue</dt>
+                <dt class="text-slate-500">Tushum</dt>
                 <dd class="text-slate-800 font-semibold"><?= number_format($revenue, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-slate-500">COGS</dt>
+                <dt class="text-slate-500">Sotilgan tovar tannarxi</dt>
                 <dd class="text-slate-600"><?= number_format($cogs, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-slate-500">Gross profit</dt>
+                <dt class="text-slate-500">Yalpi foyda</dt>
                 <dd class="text-emerald-600 font-semibold"><?= number_format($grossProfit, 2) ?> so'm</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-slate-500">Profit margin</dt>
+                <dt class="text-slate-500">Foyda marjasi</dt>
                 <dd class="text-slate-700"><?= number_format($margin, 2) ?>%</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-slate-500">Units sold</dt>
+                <dt class="text-slate-500">Sotilgan birliklar</dt>
                 <dd class="text-slate-700"><?= number_format($unitsSold, 2) ?></dd>
             </div>
         </dl>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Payments Collected</h3>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Qabul qilingan to'lovlar</h3>
         <ul class="space-y-2 text-sm">
             <?php if (empty($paymentsByMethod)): ?>
-                <li class="text-slate-500">No payments recorded in this range.</li>
+                <li class="text-slate-500">Bu davrda to'lovlar qayd etilmagan.</li>
             <?php else: ?>
                 <?php foreach ($paymentsByMethod as $row): ?>
+                    <?php
+                        $methodName = $row['payment_method'] === 'cash'
+                            ? 'Naqd'
+                            : ($row['payment_method'] === 'click' ? 'Click' : strtoupper($row['payment_method']));
+                    ?>
                     <li class="flex justify-between">
-                        <span class="uppercase text-slate-500"><?= htmlspecialchars($row['payment_method']) ?></span>
+                        <span class="text-slate-500"><?= htmlspecialchars($methodName) ?></span>
                         <span class="text-emerald-600 font-medium"><?= number_format((float)$row['total'], 2) ?> so'm</span>
                     </li>
                 <?php endforeach; ?>
             <?php endif; ?>
             <li class="flex justify-between pt-2 border-t border-slate-200 mt-2">
-                <span class="text-slate-600">Outstanding</span>
+                <span class="text-slate-600">Qarzdorlik</span>
                 <span class="text-rose-600 font-medium"><?= number_format((float)$outstanding, 2) ?> so'm</span>
             </li>
         </ul>
     </section>
     <section class="bg-white border border-slate-200 rounded-lg p-5">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">Purchases</h3>
-        <p class="text-sm text-slate-500">Stock investment for this period.</p>
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Xaridlar</h3>
+        <p class="text-sm text-slate-500">Ushbu davrda omborga kiritilgan summa.</p>
         <p class="text-2xl font-semibold text-slate-800 mt-2"><?= number_format((float)$purchasesTotal, 2) ?> so'm</p>
-        <p class="text-xs text-slate-500 mt-1">Compare against sales to monitor cashflow.</p>
+        <p class="text-xs text-slate-500 mt-1">Pul oqimini nazorat qilish uchun savdolar bilan solishtiring.</p>
     </section>
 </div>
 
 <div class="bg-white border border-slate-200 rounded-lg p-5 mt-6">
-    <h3 class="text-lg font-semibold text-slate-800 mb-4">Top Products</h3>
+    <h3 class="text-lg font-semibold text-slate-800 mb-4">Eng yaxshi mahsulotlar</h3>
     <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead>
                 <tr class="text-left text-xs uppercase text-slate-500">
-                    <th class="pb-2">Product</th>
-                    <th class="pb-2">Quantity</th>
-                    <th class="pb-2">Revenue</th>
+                    <th class="pb-2">Mahsulot</th>
+                    <th class="pb-2">Miqdor</th>
+                    <th class="pb-2">Tushum</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 <?php if (empty($salesByProduct)): ?>
                     <tr>
-                        <td colspan="3" class="py-6 text-center text-slate-400">No product sales in this range.</td>
+                        <td colspan="3" class="py-6 text-center text-slate-400">Ushbu davrda mahsulot savdosi yo'q.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($salesByProduct as $row): ?>
@@ -180,20 +185,20 @@ render_header('Hisobotlar');
 </div>
 
 <div class="bg-white border border-slate-200 rounded-lg p-5 mt-6">
-    <h3 class="text-lg font-semibold text-slate-800 mb-4">Stock on Hand</h3>
+    <h3 class="text-lg font-semibold text-slate-800 mb-4">Ombordagi qoldiq</h3>
     <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead>
                 <tr class="text-left text-xs uppercase text-slate-500">
-                    <th class="pb-2">Product</th>
-                    <th class="pb-2">In Stock</th>
-                    <th class="pb-2">Estimated Value</th>
+                    <th class="pb-2">Mahsulot</th>
+                    <th class="pb-2">Qoldiq</th>
+                    <th class="pb-2">Taxminiy qiymat</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 <?php if (empty($stockOnHand)): ?>
                     <tr>
-                        <td colspan="3" class="py-6 text-center text-slate-400">Add products to begin tracking stock.</td>
+                        <td colspan="3" class="py-6 text-center text-slate-400">Ombor monitoringi uchun mahsulotlar qo'shing.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($stockOnHand as $stock):
