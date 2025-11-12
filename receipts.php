@@ -4,6 +4,8 @@ require_once __DIR__ . '/inc/layout.php';
 $errors = [];
 $success = null;
 $action = $_POST['action'] ?? '';
+$openPriceModal = false;
+$priceModalPrefill = [];
 
 $customers = fetchAll($pdo, 'SELECT id, name FROM customers ORDER BY name');
 
@@ -12,6 +14,9 @@ if (isset($_GET['paid'])) {
 }
 if (isset($_GET['updated'])) {
     $success = "Chek ma'lumotlari yangilandi.";
+}
+if (isset($_GET['price_updated'])) {
+    $success = "Mahsulot narxlari yangilandi.";
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -142,10 +147,128 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif ($action === 'update_prices') {
+        $saleId = (int)($_POST['sale_id'] ?? 0);
+        $sale = $saleId > 0 ? fetchOne($pdo, 'SELECT * FROM sales WHERE id = ?', [$saleId]) : null;
+        $payloadRaw = $_POST['items_payload'] ?? '[]';
+        $priceModalPrefill = json_decode($payloadRaw, true);
+        if (!is_array($priceModalPrefill)) {
+            $errors[] = "Yangi narxlar noto'g'ri formatda.";
+            $priceModalPrefill = [];
+        }
+
+        if (!$sale) {
+            $errors[] = 'Chek topilmadi.';
+        }
+
+        $existingItems = [];
+        if ($sale) {
+            $existingItems = fetchAll(
+                $pdo,
+                'SELECT si.id, si.product_id, si.quantity, si.unit_price, si.total, p.name, p.unit
+                 FROM sale_items si
+                 JOIN products p ON p.id = si.product_id
+                 WHERE si.sale_id = ?',
+                [$saleId]
+            );
+            if (empty($existingItems)) {
+                $errors[] = 'Chek uchun mahsulotlar topilmadi.';
+            }
+        }
+
+        $changes = [];
+        if (empty($errors)) {
+            $itemsById = [];
+            foreach ($existingItems as $itemRow) {
+                $itemsById[(int)$itemRow['id']] = $itemRow;
+            }
+
+            foreach ($priceModalPrefill as &$entry) {
+                $itemId = (int)($entry['id'] ?? 0);
+                $newPrice = isset($entry['unit_price']) ? (float)$entry['unit_price'] : 0.0;
+
+                if ($itemId <= 0 || !isset($itemsById[$itemId])) {
+                    $errors[] = "Yangi narxlar noto'g'ri tanlandi.";
+                    continue;
+                }
+
+                if ($newPrice <= 0) {
+                    $errors[] = sprintf("%s uchun narx musbat bo'lishi kerak.", $itemsById[$itemId]['name']);
+                    continue;
+                }
+
+                $entry['unit_price'] = $newPrice;
+                $entry['quantity'] = (float)$itemsById[$itemId]['quantity'];
+                $entry['name'] = $itemsById[$itemId]['name'];
+                $entry['unit'] = $itemsById[$itemId]['unit'];
+                $entry['original_price'] = (float)$itemsById[$itemId]['unit_price'];
+
+                if (abs((float)$itemsById[$itemId]['unit_price'] - $newPrice) > 0.0001) {
+                    $changes[] = [
+                        'item_id' => $itemId,
+                        'old_price' => (float)$itemsById[$itemId]['unit_price'],
+                        'new_price' => $newPrice,
+                        'quantity' => (float)$itemsById[$itemId]['quantity'],
+                        'name' => $itemsById[$itemId]['name'],
+                    ];
+                }
+            }
+            unset($entry);
+        }
+
+        if (empty($errors)) {
+            if (empty($changes)) {
+                $success = "Narxlar o'zgartirilmagan.";
+            } else {
+                try {
+                    $pdo->beginTransaction();
+                    $updateStmt = $pdo->prepare('UPDATE sale_items SET unit_price = ?, total = ? WHERE id = ?');
+                    $auditStmt = $pdo->prepare('INSERT INTO receipt_audits (sale_id, field, old_value, new_value) VALUES (?, ?, ?, ?)');
+                    $newTotal = 0.0;
+                    $changesById = [];
+                    foreach ($changes as $change) {
+                        $changesById[$change['item_id']] = $change;
+                    }
+
+                    foreach ($existingItems as $itemRow) {
+                        $itemId = (int)$itemRow['id'];
+                        if (isset($changesById[$itemId])) {
+                            $change = $changesById[$itemId];
+                            $lineTotal = $change['quantity'] * $change['new_price'];
+                            $updateStmt->execute([$change['new_price'], $lineTotal, $itemId]);
+                            $auditStmt->execute([
+                                $saleId,
+                                'Mahsulot narxi - ' . $change['name'],
+                                number_format($change['old_price'], 2) . " so'm",
+                                number_format($change['new_price'], 2) . " so'm",
+                            ]);
+                            $newTotal += $lineTotal;
+                        } else {
+                            $newTotal += (float)$itemRow['total'];
+                        }
+                    }
+
+                    execute($pdo, 'UPDATE sales SET total_amount = ? WHERE id = ?', [$newTotal, $saleId]);
+                    $pdo->commit();
+
+                    header('Location: receipts.php?sale_id=' . $saleId . '&price_updated=1');
+                    exit;
+                } catch (Throwable $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    $errors[] = "Narxlarni yangilashda xatolik yuz berdi.";
+                }
+            }
+        }
+
+        if (!empty($errors)) {
+            $openPriceModal = true;
+        }
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($errors)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!empty($errors) || $action === 'update_prices')) {
     $saleId = (int)($_POST['sale_id'] ?? 0);
 } else {
     $saleId = isset($_GET['sale_id']) ? (int)$_GET['sale_id'] : null;
@@ -155,6 +278,7 @@ $sale = null;
 $items = [];
 $payments = [];
 $history = [];
+$priceModalItems = [];
 
 if ($saleId) {
     $sale = fetchOne($pdo, 'SELECT s.*, IFNULL(c.name, "Tasodifiy mijoz") AS customer_name
@@ -165,9 +289,40 @@ if ($saleId) {
         $items = fetchAll($pdo, 'SELECT si.*, p.name, p.unit FROM sale_items si JOIN products p ON p.id = si.product_id WHERE si.sale_id = ?', [$saleId]);
         $payments = fetchAll($pdo, 'SELECT * FROM payments WHERE sale_id = ? ORDER BY payment_date ASC', [$saleId]);
         $history = fetchAll($pdo, 'SELECT field, old_value, new_value, changed_at FROM receipt_audits WHERE sale_id = ? ORDER BY changed_at DESC', [$saleId]);
+
+        if (!empty($items)) {
+            $prefillById = [];
+            foreach ($priceModalPrefill as $prefill) {
+                if (isset($prefill['id'])) {
+                    $prefillById[(int)$prefill['id']] = $prefill;
+                }
+            }
+
+            foreach ($items as $item) {
+                $itemId = (int)$item['id'];
+                $currentPrice = isset($prefillById[$itemId])
+                    ? (float)$prefillById[$itemId]['unit_price']
+                    : (float)$item['unit_price'];
+                $quantity = (float)$item['quantity'];
+                $priceModalItems[] = [
+                    'id' => $itemId,
+                    'name' => $item['name'],
+                    'unit' => $item['unit'],
+                    'quantity' => $quantity,
+                    'original_price' => (float)$item['unit_price'],
+                    'unit_price' => $currentPrice,
+                    'total' => $quantity * $currentPrice,
+                ];
+            }
+        }
     } else {
         $saleId = null;
     }
+}
+
+$priceModalJson = json_encode($priceModalItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+if ($priceModalJson === false) {
+    $priceModalJson = '[]';
 }
 
 render_header('Cheklar');
@@ -271,7 +426,18 @@ render_header('Cheklar');
                         </button>
                     </div>
                     <div>
-                        <h4 class="font-semibold text-slate-700">Mahsulotlar</h4>
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-semibold text-slate-700">Mahsulotlar</h4>
+                            <?php if (!empty($items)): ?>
+                                <button type="button"
+                                        class="text-xs text-blue-600 font-medium hover:underline js-edit-prices"
+                                        data-id="<?= (int)$sale['id'] ?>"
+                                        data-items='<?= htmlspecialchars($priceModalJson, ENT_QUOTES, 'UTF-8') ?>'
+                                        data-open="<?= $openPriceModal ? '1' : '0' ?>">
+                                    Narxlarni tahrirlash
+                                </button>
+                            <?php endif; ?>
+                        </div>
                         <ul class="mt-2 space-y-1">
                             <?php foreach ($items as $item): ?>
                                 <li class="flex justify-between">
@@ -355,6 +521,44 @@ render_header('Cheklar');
     </div>
 </div>
 
+<div id="price-edit-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4" data-open-initial="<?= $openPriceModal ? '1' : '0' ?>">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-800">Mahsulot narxlarini tahrirlash</h3>
+                <p class="text-sm text-slate-500">Har bir mahsulot uchun yangi narxni kiriting. O'zgarishlar tarixda saqlanadi.</p>
+            </div>
+            <button type="button" class="text-slate-500 hover:text-slate-700" data-close-price>&#10005;</button>
+        </div>
+        <form method="post" class="px-5 py-4 space-y-4" id="price-edit-form">
+            <input type="hidden" name="action" value="update_prices">
+            <input type="hidden" name="sale_id" id="price-edit-sale-id" value="<?= $saleId ? (int)$saleId : '' ?>">
+            <input type="hidden" name="items_payload" id="price-edit-payload" value="">
+            <div class="border border-slate-200 rounded-lg">
+                <div class="max-h-72 overflow-y-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                            <tr class="text-left">
+                                <th class="px-3 py-2">Mahsulot</th>
+                                <th class="px-3 py-2 text-right">Miqdor</th>
+                                <th class="px-3 py-2 text-right">Joriy narx</th>
+                                <th class="px-3 py-2 text-right">Yangi narx</th>
+                                <th class="px-3 py-2 text-right">Jami</th>
+                            </tr>
+                        </thead>
+                        <tbody id="price-edit-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+            <p class="text-xs text-slate-500">Narxlarni o'zgartirish savdo summasini avtomatik yangilaydi.</p>
+            <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+                <button type="button" class="text-sm text-slate-500 hover:text-slate-700" data-close-price>Bekor qilish</button>
+                <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800">Saqlash</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="sale-edit-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
         <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
@@ -429,6 +633,148 @@ render_header('Cheklar');
                 closeModal();
             }
         });
+
+        const priceModal = document.getElementById('price-edit-modal');
+        const priceCloseButtons = document.querySelectorAll('[data-close-price]');
+        const priceBody = document.getElementById('price-edit-body');
+        const priceForm = document.getElementById('price-edit-form');
+        const pricePayload = document.getElementById('price-edit-payload');
+        const priceSaleIdInput = document.getElementById('price-edit-sale-id');
+        const currencyFormatter = new Intl.NumberFormat('uz-UZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const quantityFormatter = new Intl.NumberFormat('uz-UZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        let priceItems = [];
+
+        const renderPriceRows = () => {
+            if (!priceBody) {
+                return;
+            }
+            priceBody.innerHTML = '';
+            if (!Array.isArray(priceItems) || priceItems.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="5" class="px-3 py-4 text-center text-slate-500">Mahsulotlar topilmadi.</td>';
+                priceBody.appendChild(row);
+                return;
+            }
+
+            priceItems.forEach((item, index) => {
+                const safePrice = Number.isFinite(item.unit_price) ? item.unit_price : 0;
+                const lineTotal = item.quantity * safePrice;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-3 py-2">
+                        <div class="font-medium text-slate-800">${item.name}</div>
+                        <div class="text-xs text-slate-500">${item.unit}</div>
+                    </td>
+                    <td class="px-3 py-2 text-right text-slate-600">${quantityFormatter.format(item.quantity)} ${item.unit}</td>
+                    <td class="px-3 py-2 text-right text-slate-500">${currencyFormatter.format(item.original_price)} so'm</td>
+                    <td class="px-3 py-2 text-right">
+                        <input type="number" step="0.01" min="0.01" class="w-28 border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-slate-400" data-index="${index}" value="${safePrice.toFixed(2)}">
+                    </td>
+                    <td class="px-3 py-2 text-right font-semibold text-slate-800" data-total="${index}">${currencyFormatter.format(lineTotal)} so'm</td>
+                `;
+                priceBody.appendChild(row);
+            });
+        };
+
+        const openPriceModal = (saleId, items) => {
+            if (!priceModal) {
+                return;
+            }
+            priceItems = Array.isArray(items)
+                ? items.map((item) => ({
+                    id: Number(item.id) || 0,
+                    name: item.name || '',
+                    unit: item.unit || '',
+                    quantity: Number(item.quantity) || 0,
+                    original_price: Number(item.original_price) || 0,
+                    unit_price: Number(item.unit_price) > 0 ? Number(item.unit_price) : (Number(item.original_price) || 0),
+                }))
+                : [];
+            priceSaleIdInput.value = saleId || '';
+            renderPriceRows();
+            priceModal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        };
+
+        const closePriceModal = () => {
+            if (!priceModal) {
+                return;
+            }
+            priceModal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        };
+
+        document.querySelectorAll('.js-edit-prices').forEach(button => {
+            button.addEventListener('click', () => {
+                const saleId = button.dataset.id || '';
+                let items = [];
+                try {
+                    const parsed = JSON.parse(button.dataset.items || '[]');
+                    if (Array.isArray(parsed)) {
+                        items = parsed;
+                    }
+                } catch (error) {
+                    items = [];
+                }
+                openPriceModal(saleId, items);
+            });
+        });
+
+        priceCloseButtons.forEach(btn => btn.addEventListener('click', closePriceModal));
+        priceModal?.addEventListener('click', (event) => {
+            if (event.target === priceModal) {
+                closePriceModal();
+            }
+        });
+
+        priceBody?.addEventListener('input', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLInputElement)) {
+                return;
+            }
+            const index = Number(target.dataset.index);
+            if (!Number.isFinite(index) || !priceItems[index]) {
+                return;
+            }
+            let value = parseFloat(target.value);
+            if (!Number.isFinite(value) || value <= 0) {
+                value = 0;
+            }
+            priceItems[index].unit_price = value;
+            const totalCell = priceBody.querySelector(`[data-total="${index}"]`);
+            if (totalCell) {
+                const lineTotal = priceItems[index].quantity * priceItems[index].unit_price;
+                totalCell.textContent = `${currencyFormatter.format(lineTotal)} so'm`;
+            }
+        });
+
+        priceForm?.addEventListener('submit', () => {
+            if (!pricePayload) {
+                return;
+            }
+            const payload = priceItems.map(item => ({
+                id: item.id,
+                unit_price: item.unit_price,
+                name: item.name,
+                unit: item.unit,
+            }));
+            pricePayload.value = JSON.stringify(payload);
+        });
+
+        const autoOpenButton = document.querySelector('.js-edit-prices[data-open="1"]');
+        if (autoOpenButton) {
+            autoOpenButton.dataset.open = '0';
+            let items = [];
+            try {
+                const parsed = JSON.parse(autoOpenButton.dataset.items || '[]');
+                if (Array.isArray(parsed)) {
+                    items = parsed;
+                }
+            } catch (error) {
+                items = [];
+            }
+            openPriceModal(autoOpenButton.dataset.id || '', items);
+        }
     });
 </script>
 <?php
