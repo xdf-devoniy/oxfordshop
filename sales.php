@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/inc/auth.php';
+require_login();
 require_once __DIR__ . '/inc/layout.php';
 
 $errors = [];
@@ -228,101 +230,157 @@ if ($cartJson === false) {
     $cartJson = '[]';
 }
 
+$today = date('Y-m-d');
+$todaySummary = fetchOne(
+    $pdo,
+    'SELECT COUNT(*) AS sale_count, IFNULL(SUM(total_amount), 0) AS total_amount FROM sales WHERE sale_date = ?',
+    [$today]
+);
+$todayRevenue = (float)($todaySummary['total_amount'] ?? 0);
+$todaySalesCount = (int)($todaySummary['sale_count'] ?? 0);
+
+$openDebtRow = fetchOne(
+    $pdo,
+    'SELECT IFNULL(SUM(s.total_amount - IFNULL(pay.total_paid, 0)), 0) AS balance
+     FROM sales s
+     LEFT JOIN (
+        SELECT sale_id, SUM(amount) AS total_paid FROM payments GROUP BY sale_id
+     ) pay ON pay.sale_id = s.id'
+);
+$openDebtTotal = (float)($openDebtRow['balance'] ?? 0);
+
+$monthStart = date('Y-m-01');
+$monthTopProduct = fetchOne(
+    $pdo,
+    'SELECT p.name, SUM(si.total) AS revenue
+     FROM sale_items si
+     JOIN sales s ON s.id = si.sale_id
+     JOIN products p ON p.id = si.product_id
+     WHERE s.sale_date BETWEEN ? AND ?
+     GROUP BY si.product_id, p.name
+     ORDER BY revenue DESC
+     LIMIT 1',
+    [$monthStart, $today]
+);
+$topProductName = $monthTopProduct['name'] ?? null;
+$topProductRevenue = (float)($monthTopProduct['revenue'] ?? 0);
+
+$lowestStockProduct = null;
+foreach ($products as $product) {
+    $stockQty = (float)($stockLevels[$product['id']] ?? 0);
+    if ($lowestStockProduct === null || $stockQty < $lowestStockProduct['stock']) {
+        $lowestStockProduct = [
+            'name' => $product['name'],
+            'stock' => $stockQty,
+            'unit' => $product['unit'],
+        ];
+    }
+}
+
 $shouldOpenSaleModal = $_SERVER['REQUEST_METHOD'] === 'POST' && !empty($products);
 
 render_header('Savdolar');
 ?>
 <style>
-    .product-button {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        padding: 0.85rem;
-        text-align: left;
-        background-color: #ffffff;
-        transition: all 0.15s ease-in-out;
-    }
-    .product-button:not([data-disabled="1"]):hover {
-        border-color: #0f172a;
-        box-shadow: 0 10px 25px -15px rgba(15, 23, 42, 0.4);
-    }
-    .product-button[data-disabled="1"] {
-        opacity: 0.45;
-        cursor: not-allowed;
-    }
-    .product-button [data-selected-pill] {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        border-radius: 9999px;
-        background-color: #dcfce7;
-        color: #166534;
-        font-size: 0.75rem;
-        padding: 0.1rem 0.5rem;
-    }
     .payment-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        padding: 0.85rem;
+        border: 1px solid rgb(226 232 240);
+        border-radius: 1rem;
+        padding: 1rem;
         display: flex;
-        gap: 0.65rem;
+        gap: 0.75rem;
         align-items: flex-start;
         cursor: pointer;
-        transition: all 0.15s ease-in-out;
+        background-color: white;
+        transition: all 0.2s ease;
     }
     .payment-card input {
         display: none;
     }
-    .payment-card.active {
-        border-color: #0f172a;
-        background-color: #0f172a;
-        color: #f8fafc;
-    }
-    .payment-card:not(.active):hover {
-        border-color: #cbd5f5;
-        box-shadow: 0 10px 25px -15px rgba(15, 23, 42, 0.4);
+    .payment-card.is-active {
+        border-color: rgb(20 184 166);
+        background-color: rgb(236 253 245);
+        box-shadow: 0 20px 45px -25px rgba(15, 118, 110, 0.45);
     }
 </style>
 <div class="space-y-6">
     <?php if ($success): ?>
-        <div class="border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm px-3 py-2 rounded flex items-center justify-between">
+        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 flex items-center justify-between gap-4">
             <span><?= htmlspecialchars($success) ?></span>
             <?php if (!empty($lastSale)): ?>
-                <a href="receipts.php?sale_id=<?= (int)$lastSale['id'] ?>" class="text-xs underline">Chekni ko'rish</a>
+                <a href="receipts.php?sale_id=<?= (int)$lastSale['id'] ?>" class="text-xs font-semibold text-emerald-800 underline">Chekni ko'rish</a>
             <?php endif; ?>
         </div>
     <?php endif; ?>
 
-    <div class="bg-white border border-slate-200 rounded-lg p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <h2 class="text-lg font-semibold text-slate-800">Savdo yarating</h2>
-            <p class="text-sm text-slate-500">Mahsulotlarni tanlab, to'lov usulini belgilang va savdoni saqlang.</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <?php if (empty($products)): ?>
-                <a href="products.php" class="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50">Avval mahsulot qo'shing</a>
-            <?php else: ?>
-                <button type="button" id="open-sale-modal" class="inline-flex items-center justify-center bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-slate-800">Yangi savdo</button>
-            <?php endif; ?>
-        </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <section class="lg:col-span-2 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-8 relative overflow-hidden">
+            <div class="absolute inset-y-0 right-0 w-2/3 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.35),_transparent_65%)] opacity-60 pointer-events-none"></div>
+            <div class="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div class="space-y-4 max-w-xl">
+                    <p class="text-xs uppercase tracking-[0.4em] text-white/60">Savdo rejimi</p>
+                    <h2 class="text-3xl font-semibold leading-tight">Mahsulotlarni tez tanlang va savdoni yakunlang</h2>
+                    <p class="text-sm text-white/70">Modal oynada katalog, savdo cheki va mijoz ma'lumotlari bir joyda jamlangan.</p>
+                    <div class="flex flex-wrap gap-3">
+                        <?php if (empty($products)): ?>
+                            <a href="products.php" class="inline-flex items-center rounded-full bg-white/10 px-5 py-2 text-sm font-semibold text-white hover:bg-white/20">Avval mahsulot qo'shing</a>
+                        <?php else: ?>
+                            <button type="button" id="open-sale-modal" class="inline-flex items-center rounded-full bg-white text-slate-900 px-6 py-3 text-sm font-semibold shadow-lg shadow-slate-900/40 hover:-translate-y-0.5 transition">Yangi savdo</button>
+                        <?php endif; ?>
+                        <a href="receipts.php" class="inline-flex items-center rounded-full border border-white/40 px-5 py-2 text-sm font-semibold text-white/80 hover:text-white">Cheklar tarixi</a>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 w-full lg:w-72">
+                    <div class="rounded-2xl bg-white/10 p-4">
+                        <p class="text-xs text-white/60">Bugungi tushum</p>
+                        <p class="mt-2 text-2xl font-semibold"><?= number_format($todayRevenue, 0, '.', ' ') ?> so'm</p>
+                    </div>
+                    <div class="rounded-2xl bg-white/10 p-4">
+                        <p class="text-xs text-white/60">Bugun savdolar</p>
+                        <p class="mt-2 text-2xl font-semibold"><?= number_format($todaySalesCount) ?></p>
+                    </div>
+                    <div class="col-span-2 rounded-2xl bg-white/10 p-4">
+                        <p class="text-xs text-white/60">Qarzdorlik</p>
+                        <p class="mt-2 text-2xl font-semibold text-amber-200"><?= number_format($openDebtTotal, 0, '.', ' ') ?> so'm</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="rounded-3xl border border-white/10 bg-white/90 backdrop-blur p-6 space-y-4 text-slate-900">
+            <div>
+                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Analitika</p>
+                <h3 class="text-xl font-semibold">Tezkor ko'rsatkichlar</h3>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Oy favorit mahsulot</span>
+                    <span class="font-semibold text-slate-900"><?= $topProductName ? htmlspecialchars($topProductName) : "Ma'lumot yo'q" ?></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Oy bo'yicha tushum</span>
+                    <span class="font-semibold text-emerald-600"><?= number_format($topProductRevenue, 0, '.', ' ') ?> so'm</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-500">Eng kam qoldiq</span>
+                    <span class="font-semibold text-rose-600"><?= $lowestStockProduct ? htmlspecialchars($lowestStockProduct['name']) . ' · ' . number_format($lowestStockProduct['stock'], 2) . ' ' . htmlspecialchars($lowestStockProduct['unit']) : "Ma'lumot yo'q" ?></span>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 
-<div id="sale-modal" class="fixed inset-0 z-40 <?= $shouldOpenSaleModal ? '' : 'hidden' ?> flex items-center justify-center bg-slate-900/50 px-4" data-open-initial="<?= $shouldOpenSaleModal ? '1' : '0' ?>">
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-        <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+<div id="sale-modal" class="fixed inset-0 z-40 <?= $shouldOpenSaleModal ? '' : 'hidden' ?> bg-slate-950/70 backdrop-blur-sm px-4 py-8 flex items-start justify-center" data-open-initial="<?= $shouldOpenSaleModal ? '1' : '0' ?>">
+    <div class="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
+        <div class="flex items-center justify-between border-b border-slate-200 px-8 py-5">
             <div>
-                <h3 class="text-lg font-semibold text-slate-800">Yangi savdo</h3>
-                <p class="text-sm text-slate-500">Mahsulotlarni tanlang va pastda savdo ma'lumotlarini to'ldiring.</p>
+                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Yangi savdo</p>
+                <h3 class="text-2xl font-semibold text-slate-900">Modal savdo oynasi</h3>
             </div>
-            <button type="button" class="text-slate-500 hover:text-slate-700" id="close-sale-modal">&#10005;</button>
+            <button type="button" class="h-10 w-10 rounded-full border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center" id="close-sale-modal">&times;</button>
         </div>
-        <div class="px-6 py-5 overflow-y-auto">
+        <div class="flex-1 overflow-y-auto px-8 py-6">
             <?php if (!empty($errors)): ?>
-                <div class="border border-rose-200 bg-rose-50 text-rose-700 text-sm px-3 py-2 rounded mb-5">
-                    <ul class="list-disc pl-4 space-y-1">
+                <div class="rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 px-5 py-4 mb-5 text-sm">
+                    <ul class="list-disc space-y-1 pl-4">
                         <?php foreach ($errors as $error): ?>
                             <li><?= htmlspecialchars($error) ?></li>
                         <?php endforeach; ?>
@@ -331,130 +389,120 @@ render_header('Savdolar');
             <?php endif; ?>
 
             <?php if (empty($products)): ?>
-                <div class="bg-white border border-dashed border-slate-300 rounded-lg p-6 text-sm text-slate-600 text-center">
-                    Avval mahsulot qo'shing. <a class="text-blue-600" href="products.php">Mahsulotlar</a> bo'limiga o'ting.
+                <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center py-10 text-sm text-slate-500">
+                    Avval mahsulot qo'shing. <a href="products.php" class="text-brand-600 font-semibold">Mahsulotlar</a> sahifasiga o'ting.
                 </div>
             <?php else: ?>
                 <form method="post" class="space-y-6" id="sale-form">
                     <input type="hidden" name="cart_payload" id="cart-payload" value='<?= htmlspecialchars($cartJson, ENT_QUOTES, 'UTF-8') ?>'>
-                    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                        <section class="xl:col-span-2 space-y-6">
-                            <div class="border border-slate-200 rounded-lg p-5">
-                                <div class="flex items-start justify-between mb-4">
+                    <div class="flex flex-col xl:flex-row gap-6">
+                        <section class="xl:w-2/3 space-y-6">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                     <div>
-                                        <h3 class="text-lg font-semibold text-slate-800">Mahsulot katalogi</h3>
-                                        <p class="text-sm text-slate-500">Pastdagi tugmalardan foydalanib savdo chekingizni to'ldiring.</p>
+                                        <h3 class="text-lg font-semibold text-slate-900">Mahsulot katalogi</h3>
+                                        <p class="text-sm text-slate-500">Har bir karta + va − tugmalari bilan boshqariladi.</p>
                                     </div>
-                                    <div class="text-right text-xs text-slate-400">
-                                        Ombordagi qoldiq asosida mahsulotlar cheklanadi.
+                                    <div class="relative w-full lg:w-64">
+                                        <input type="search" id="product-search" placeholder="Mahsulotni qidiring..." class="w-full rounded-2xl border border-slate-200 bg-white/80 pl-11 pr-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
                                     </div>
                                 </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="product-grid">
-                                    <?php foreach ($products as $product): ?>
-                                        <?php
-                                            $price = (float)$product['default_price'];
-                                            $stock = (float)($stockLevels[$product['id']] ?? 0);
-                                            $disabled = $stock <= 0 || $price <= 0;
-                                        ?>
-                                        <button type="button"
-                                                id="product-card-<?= (int)$product['id'] ?>"
-                                                class="product-button"
-                                                data-id="<?= (int)$product['id'] ?>"
-                                                data-stock="<?= htmlspecialchars(number_format($stock, 2, '.', '')) ?>"
-                                                data-price="<?= htmlspecialchars(number_format($price, 2, '.', '')) ?>"
-                                                data-disabled="<?= $disabled ? '1' : '0' ?>"
-                                                <?= $disabled ? 'disabled' : '' ?>>
-                                            <div class="font-semibold text-slate-800 truncate" title="<?= htmlspecialchars($product['name']) ?>">
-                                                <?= htmlspecialchars($product['name']) ?>
+                                <div class="mt-4 max-h-[360px] overflow-y-auto pr-1">
+                                    <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <?php foreach ($products as $product): ?>
+                                            <?php
+                                                $price = (float)$product['default_price'];
+                                                $stock = (float)($stockLevels[$product['id']] ?? 0);
+                                                $disabled = $stock <= 0 || $price <= 0;
+                                                $searchName = function_exists('mb_strtolower')
+                                                    ? mb_strtolower($product['name'])
+                                                    : strtolower($product['name']);
+                                            ?>
+                                            <div class="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-brand-300 <?= $disabled ? 'opacity-40 pointer-events-none' : '' ?>"
+                                                 data-product-card
+                                                 data-product-id="<?= (int)$product['id'] ?>"
+                                                 data-product-name="<?= htmlspecialchars($searchName) ?>"
+                                                 data-product-stock="<?= htmlspecialchars(number_format($stock, 2, '.', '')) ?>">
+                                                <div class="flex items-start justify-between gap-2">
+                                                    <div>
+                                                        <p class="font-semibold text-slate-900 truncate" title="<?= htmlspecialchars($product['name']) ?>"><?= htmlspecialchars($product['name']) ?></p>
+                                                        <p class="text-xs text-slate-400 mt-1"><?= htmlspecialchars($product['unit']) ?></p>
+                                                    </div>
+                                                    <div class="text-right text-sm font-semibold text-brand-600"><?= number_format($price, 0, '.', ' ') ?> so'm</div>
+                                                </div>
+                                                <div class="mt-4 flex items-center justify-between gap-3">
+                                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">Ombor: <?= number_format($stock, 2) ?></span>
+                                                    <div class="flex items-center gap-2">
+                                                        <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="minus">−</button>
+                                                        <span class="w-8 text-center font-semibold text-slate-900" data-product-qty>0</span>
+                                                        <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="plus">+</button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="text-sm text-slate-500 flex items-center justify-between">
-                                                <span><?= number_format($price, 0, '.', ' ') ?> so'm</span>
-                                                <span><?= htmlspecialchars($product['unit']) ?></span>
-                                            </div>
-                                            <div class="text-xs <?= $stock > 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
-                                                <?= $stock > 0 ? 'Omborda: ' . number_format($stock, 2) : 'Omborda mavjud emas' ?>
-                                            </div>
-                                            <span class="hidden" data-selected-pill>
-                                                Tanlangan: <span data-selected-count>0</span>
-                                            </span>
-                                        </button>
-                                    <?php endforeach; ?>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <p id="product-empty" class="hidden py-6 text-center text-sm text-slate-400">Natija topilmadi.</p>
                                 </div>
                             </div>
-                            <div class="border border-slate-200 rounded-lg p-5">
-                                <div class="flex items-center justify-between mb-3">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5">
+                                <div class="flex flex-wrap items-center justify-between gap-4">
                                     <div>
-                                        <h3 class="text-base font-semibold text-slate-800">Savdo cheki</h3>
-                                        <p class="text-sm text-slate-500">Mahsulot sonini + va − tugmalari orqali boshqaring.</p>
+                                        <h3 class="text-lg font-semibold text-slate-900">Tanlangan mahsulotlar</h3>
+                                        <p class="text-sm text-slate-500">Chek avtomatik tarzda yangilanadi.</p>
                                     </div>
-                                    <div class="text-right text-sm text-slate-500">
-                                        <p>Umumiy summa</p>
-                                        <p class="text-lg font-semibold text-slate-800"><span id="cart-total">0</span> so'm</p>
-                                    </div>
-                                </div>
-                                <div class="border border-slate-200 rounded-lg">
-                                    <div class="max-h-72 overflow-y-auto">
-                                        <table class="min-w-full text-sm">
-                                            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
-                                                <tr class="text-left">
-                                                    <th class="px-3 py-2">Mahsulot</th>
-                                                    <th class="px-3 py-2 text-center">Soni</th>
-                                                    <th class="px-3 py-2 text-right">Narx</th>
-                                                    <th class="px-3 py-2 text-right">Jami</th>
-                                                    <th class="px-3 py-2 text-center">O'chirish</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="cart-items" class="divide-y divide-slate-100"></tbody>
-                                        </table>
-                                        <div id="empty-cart" class="px-4 py-6 text-center text-sm text-slate-500">
-                                            Mahsulot tanlang va savdo cheki shu yerda ko'rinadi.
-                                        </div>
+                                    <div class="text-right">
+                                        <p class="text-xs text-slate-400">Umumiy summa</p>
+                                        <p class="text-2xl font-semibold text-slate-900"><span id="cart-total">0</span> so'm</p>
                                     </div>
                                 </div>
-                                <p class="text-xs text-slate-500 mt-3">Narxlar avtomatik ravishda mahsulot kartasidagi standart narxdan olinadi.</p>
+                                <div class="mt-4 space-y-3" id="cart-items"></div>
+                                <div id="empty-cart" class="rounded-2xl border border-dashed border-slate-200 text-center py-8 text-sm text-slate-400">Mahsulot tanlang va shu yerda paydo bo'ladi.</div>
                             </div>
                         </section>
-                        <section class="space-y-6">
-                            <div class="border border-slate-200 rounded-lg p-5 space-y-4">
+                        <section class="xl:w-1/3 space-y-6">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700">Savdo sanasi</label>
-                                    <input type="date" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" required>
+                                    <label class="text-sm font-semibold text-slate-700">Savdo sanasi</label>
+                                    <input type="date" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200" required>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700">Izoh</label>
-                                    <textarea name="notes" rows="3" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Masalan: tushlik vaqti savdosi."><?= htmlspecialchars($notes) ?></textarea>
+                                    <label class="text-sm font-semibold text-slate-700">Izoh</label>
+                                    <textarea name="notes" rows="4" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200" placeholder="Masalan: tushlik savdosi."><?= htmlspecialchars($notes) ?></textarea>
                                 </div>
                             </div>
-                            <div class="border border-slate-200 rounded-lg p-5">
-                                <h3 class="text-base font-semibold text-slate-800 mb-3">To'lov va mijoz</h3>
-                                <p class="text-sm text-slate-500 mb-4">Qaysi usulda to'lov qabul qilinganini belgilang. Qarz savdosi uchun mijozni kiriting.</p>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4" id="payment-options">
-                                    <label class="payment-card <?= $currentMode === 'cash' ? 'active' : '' ?>">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-900">To'lov va mijoz</h3>
+                                    <p class="text-sm text-slate-500">Qaysi usulda to'lov olindi va agar kerak bo'lsa qarzdor mijozni belgilang.</p>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="payment-options">
+                                    <label class="payment-card <?= $currentMode === 'cash' ? 'is-active' : '' ?>">
                                         <input type="radio" name="payment_mode" value="cash" <?= $currentMode === 'cash' ? 'checked' : '' ?>>
-                                        <span>
-                                            <span class="block font-semibold">Naqd</span>
-                                            <span class="block text-xs">To'liq naqd to'lov</span>
-                                        </span>
+                                        <div>
+                                            <p class="font-semibold text-slate-900">Naqd</p>
+                                            <p class="text-xs text-slate-500">To'liq naqd to'lov</p>
+                                        </div>
                                     </label>
-                                    <label class="payment-card <?= $currentMode === 'click' ? 'active' : '' ?>">
+                                    <label class="payment-card <?= $currentMode === 'click' ? 'is-active' : '' ?>">
                                         <input type="radio" name="payment_mode" value="click" <?= $currentMode === 'click' ? 'checked' : '' ?>>
-                                        <span>
-                                            <span class="block font-semibold">Click</span>
-                                            <span class="block text-xs">To'liq raqamli to'lov</span>
-                                        </span>
+                                        <div>
+                                            <p class="font-semibold text-slate-900">Click</p>
+                                            <p class="text-xs text-slate-500">Raqamli to'lov</p>
+                                        </div>
                                     </label>
-                                    <label class="payment-card <?= $currentMode === 'debt' ? 'active' : '' ?>">
+                                    <label class="payment-card <?= $currentMode === 'debt' ? 'is-active' : '' ?>">
                                         <input type="radio" name="payment_mode" value="debt" <?= $currentMode === 'debt' ? 'checked' : '' ?>>
-                                        <span>
-                                            <span class="block font-semibold">Qarz</span>
-                                            <span class="block text-xs">To'lov keyin olinadi</span>
-                                        </span>
+                                        <div>
+                                            <p class="font-semibold text-slate-900">Qarz</p>
+                                            <p class="text-xs text-slate-500">To'lov keyin olinadi</p>
+                                        </div>
                                     </label>
                                 </div>
                                 <div id="debt-fields" class="<?= $currentMode === 'debt' ? '' : 'hidden' ?> space-y-3">
                                     <div>
-                                        <label class="block text-sm font-medium text-slate-700">Mavjud mijoz</label>
-                                        <select name="customer_id" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400">
+                                        <label class="text-sm font-semibold text-slate-700">Mavjud mijoz</label>
+                                        <select name="customer_id" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200">
                                             <option value="0">Tanlanmagan</option>
                                             <?php foreach ($customers as $customer): ?>
                                                 <option value="<?= (int)$customer['id'] ?>" <?= $selectedCustomerId === (int)$customer['id'] ? 'selected' : '' ?>><?= htmlspecialchars($customer['name']) ?></option>
@@ -462,48 +510,19 @@ render_header('Savdolar');
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-slate-700">Yangi mijoz ismi</label>
-                                        <input type="text" name="new_customer" value="<?= htmlspecialchars($newCustomerName) ?>" class="mt-1 w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-slate-400" placeholder="Masalan, Azizbek">
-                                        <p class="text-xs text-slate-500 mt-1">Agar mijoz ro'yxatda bo'lmasa, shu yerga kiriting.</p>
+                                        <label class="text-sm font-semibold text-slate-700">Yangi mijoz ismi</label>
+                                        <input type="text" name="new_customer" value="<?= htmlspecialchars($newCustomerName) ?>" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200" placeholder="Masalan, Azizbek">
+                                        <p class="text-xs text-slate-400 mt-1">Agar mijoz ro'yxatda bo'lmasa, shu yerga kiriting.</p>
                                     </div>
                                 </div>
-                                <div class="pt-4 mt-4 border-t border-slate-200 flex items-center justify-between">
-                                    <div class="text-sm text-slate-500">Barcha summalar o'zbek so'mida hisoblanadi.</div>
-                                    <button type="submit" class="inline-flex items-center justify-center bg-slate-900 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-slate-800">Savdoni saqlash</button>
+                                <div class="pt-4 mt-2 border-t border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p class="text-xs text-slate-400">Barcha summalar o'zbek so'mida.</p>
+                                    <button type="submit" class="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-brand-500 to-emerald-400 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50">Savdoni saqlash</button>
                                 </div>
                             </div>
                         </section>
                     </div>
                 </form>
-                <div id="product-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-                    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
-                        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-                            <div>
-                                <h3 class="text-lg font-semibold text-slate-800" id="product-modal-name">Mahsulot</h3>
-                                <p class="text-sm text-slate-500" id="product-modal-stock"></p>
-                            </div>
-                            <button type="button" class="text-slate-500 hover:text-slate-700" data-close-product-modal>&#10005;</button>
-                        </div>
-                        <div class="px-5 py-4 space-y-4">
-                            <div>
-                                <p class="text-sm text-slate-500">Narx</p>
-                                <p class="text-lg font-semibold text-slate-800" id="product-modal-price">0 so'm</p>
-                            </div>
-                            <div>
-                                <p class="text-sm text-slate-500 mb-2">Miqdor</p>
-                                <div class="flex items-center justify-center gap-4">
-                                    <button type="button" id="product-modal-minus" class="h-10 w-10 rounded-full border border-slate-300 flex items-center justify-center text-lg text-slate-600 hover:bg-slate-100">−</button>
-                                    <span class="text-2xl font-semibold text-slate-800" id="product-modal-qty">1</span>
-                                    <button type="button" id="product-modal-plus" class="h-10 w-10 rounded-full border border-slate-300 flex items-center justify-center text-lg text-slate-600 hover:bg-slate-100">+</button>
-                                </div>
-                            </div>
-                            <div class="flex items-center justify-between pt-2 border-t border-slate-200">
-                                <button type="button" class="text-sm text-slate-500 hover:text-slate-700" data-close-product-modal>Bekor qilish</button>
-                                <button type="button" id="product-modal-confirm" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800">Savdoga qo'shish</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             <?php endif; ?>
         </div>
     </div>
@@ -549,199 +568,173 @@ render_header('Savdolar');
 </script>
 <?php if (!empty($products)): ?>
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
         const productCatalog = new Map((<?= $catalogJson ?>).map(item => [Number(item.id), item]));
         const initialCart = (<?= $cartJson ?>);
-
         const cart = new Map();
-        const cartTableBody = document.getElementById('cart-items');
+        const cartContainer = document.getElementById('cart-items');
         const cartTotalEl = document.getElementById('cart-total');
         const emptyCartNotice = document.getElementById('empty-cart');
         const payloadInput = document.getElementById('cart-payload');
-        const productButtons = new Map();
+        const productCards = new Map();
+        const searchInput = document.getElementById('product-search');
+        const productEmptyState = document.getElementById('product-empty');
         const formatter = new Intl.NumberFormat('uz-UZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-        document.querySelectorAll('.product-button').forEach(button => {
-            const id = Number(button.dataset.id);
-            productButtons.set(id, button);
-            button.addEventListener('click', () => {
-                if (button.dataset.disabled === '1') {
+        document.querySelectorAll('[data-product-card]').forEach(card => {
+            const productId = Number(card.dataset.productId);
+            if (!productId) {
+                return;
+            }
+            const meta = {
+                card,
+                minus: card.querySelector('[data-action="minus"]'),
+                plus: card.querySelector('[data-action="plus"]'),
+                qty: card.querySelector('[data-product-qty]'),
+                stock: Number(card.dataset.productStock ?? '0'),
+                disabled: card.classList.contains('pointer-events-none')
+            };
+            productCards.set(productId, meta);
+
+            meta.plus?.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (meta.disabled) {
                     return;
                 }
-                openProductModal(id);
+                const current = cart.get(productId)?.quantity ?? 0;
+                setQuantity(productId, current + 1);
+            });
+
+            meta.minus?.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (meta.disabled) {
+                    return;
+                }
+                const current = cart.get(productId)?.quantity ?? 0;
+                setQuantity(productId, current - 1);
+            });
+
+            card.addEventListener('click', (event) => {
+                if (meta.disabled || event.target.closest('[data-action]')) {
+                    return;
+                }
+                const current = cart.get(productId)?.quantity ?? 0;
+                setQuantity(productId, current + 1);
             });
         });
 
-        const productModal = document.getElementById('product-modal');
-        const modalName = document.getElementById('product-modal-name');
-        const modalPrice = document.getElementById('product-modal-price');
-        const modalStock = document.getElementById('product-modal-stock');
-        const modalQuantityValue = document.getElementById('product-modal-qty');
-        const modalMinus = document.getElementById('product-modal-minus');
-        const modalPlus = document.getElementById('product-modal-plus');
-        const modalConfirm = document.getElementById('product-modal-confirm');
-        const modalCloseButtons = document.querySelectorAll('[data-close-product-modal]');
-
-        let activeProductId = null;
-        let modalQuantity = 1;
-
-        const closeProductModal = () => {
-            productModal?.classList.add('hidden');
-            activeProductId = null;
+        const filterProducts = () => {
+            const query = (searchInput?.value ?? '').toLowerCase().trim();
+            let visibleCount = 0;
+            productCards.forEach((meta) => {
+                const haystack = meta.card.dataset.productName ?? '';
+                const isVisible = haystack.includes(query);
+                meta.card.classList.toggle('hidden', !isVisible);
+                if (isVisible) {
+                    visibleCount += 1;
+                }
+            });
+            if (productEmptyState) {
+                productEmptyState.classList.toggle('hidden', visibleCount > 0);
+            }
         };
-
-        modalCloseButtons.forEach(button => {
-            button.addEventListener('click', () => closeProductModal());
-        });
-
-        productModal?.addEventListener('click', (event) => {
-            if (event.target === productModal) {
-                closeProductModal();
-            }
-        });
-
-        function openProductModal(productId) {
-            if (!productCatalog.has(productId)) {
-                return;
-            }
-            activeProductId = productId;
-            const product = productCatalog.get(productId);
-            modalName.textContent = product.name;
-            modalPrice.textContent = formatter.format(product.price) + ' so\'m';
-            modalStock.textContent = product.stock > 0
-                ? `Omborda: ${formatter.format(product.stock)} ${product.unit}`
-                : 'Omborda mavjud emas';
-            const existing = cart.get(productId)?.quantity ?? 0;
-            modalQuantity = existing > 0 ? existing : 1;
-            updateModalQuantity(product);
-            productModal.classList.remove('hidden');
-        }
-
-        function updateModalQuantity(product) {
-            modalQuantity = Math.max(1, Math.round(modalQuantity * 100) / 100);
-            if (product.stock > 0 && modalQuantity > product.stock) {
-                modalQuantity = product.stock;
-            }
-            modalQuantityValue.textContent = modalQuantity;
-            modalMinus.disabled = modalQuantity <= 1;
-            if (product.stock > 0) {
-                modalPlus.disabled = modalQuantity >= product.stock;
-            } else {
-                modalPlus.disabled = false;
-            }
-        }
-
-        modalMinus?.addEventListener('click', () => {
-            if (activeProductId === null) {
-                return;
-            }
-            const product = productCatalog.get(activeProductId);
-            modalQuantity = Math.max(1, modalQuantity - 1);
-            updateModalQuantity(product);
-        });
-
-        modalPlus?.addEventListener('click', () => {
-            if (activeProductId === null) {
-                return;
-            }
-            const product = productCatalog.get(activeProductId);
-            modalQuantity += 1;
-            updateModalQuantity(product);
-        });
-
-        modalConfirm?.addEventListener('click', () => {
-            if (activeProductId === null) {
-                return;
-            }
-            setQuantity(activeProductId, modalQuantity);
-            closeProductModal();
-            const badge = productButtons.get(activeProductId)?.querySelector('[data-selected-pill]');
-            if (badge) {
-                badge.classList.remove('hidden');
-            }
-        });
+        searchInput?.addEventListener('input', filterProducts);
+        filterProducts();
 
         function setQuantity(productId, quantity) {
             if (!productCatalog.has(productId)) {
                 return;
             }
             const product = productCatalog.get(productId);
+            const meta = productCards.get(productId);
+            if (meta?.disabled) {
+                return;
+            }
             if (quantity <= 0) {
                 cart.delete(productId);
-            } else if (product.stock > 0 && quantity > product.stock + 0.0001) {
-                alert('Omborda yetarli mahsulot yo\'q.');
-                return;
             } else {
-                cart.set(productId, { product_id: productId, quantity: quantity });
+                let allowed = quantity;
+                if (product.stock > 0 && allowed > product.stock) {
+                    allowed = product.stock;
+                }
+                cart.set(productId, { product_id: productId, quantity: Math.round(allowed * 100) / 100 });
             }
-            renderCart();
-        }
-
-        function removeItem(productId) {
-            cart.delete(productId);
             renderCart();
         }
 
         function renderCart() {
-            cartTableBody.innerHTML = '';
-            let total = 0;
-            cart.forEach((item, productId) => {
-                if (!productCatalog.has(productId)) {
-                    return;
-                }
-                const product = productCatalog.get(productId);
-                const lineTotal = item.quantity * product.price;
-                total += lineTotal;
-
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="px-3 py-2 text-slate-700">
-                        <div class="font-medium">${product.name}</div>
-                        <div class="text-xs text-slate-500">${formatter.format(product.price)} so'm · ${product.unit}</div>
-                    </td>
-                    <td class="px-3 py-2">
-                        <div class="flex items-center justify-center gap-2">
-                            <button type="button" class="h-7 w-7 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-slate-100" data-action="decrease" data-id="${productId}">−</button>
-                            <span class="min-w-[2.5rem] text-center font-semibold">${item.quantity}</span>
-                            <button type="button" class="h-7 w-7 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-slate-100" data-action="increase" data-id="${productId}">+</button>
-                        </div>
-                    </td>
-                    <td class="px-3 py-2 text-right text-slate-600">${formatter.format(product.price)} so'm</td>
-                    <td class="px-3 py-2 text-right font-semibold text-slate-800">${formatter.format(lineTotal)} so'm</td>
-                    <td class="px-3 py-2 text-center">
-                        <button type="button" class="text-rose-600 text-sm" data-action="remove" data-id="${productId}">O'chirish</button>
-                    </td>
-                `;
-                cartTableBody.appendChild(row);
-            });
-
-            cartTotalEl.textContent = formatter.format(total);
-            emptyCartNotice.classList.toggle('hidden', cart.size > 0);
-            payloadInput.value = JSON.stringify(Array.from(cart.values()));
-
-            productButtons.forEach((button, productId) => {
-                const badge = button.querySelector('[data-selected-pill]');
-                if (!badge) {
-                    return;
-                }
-                const countEl = badge.querySelector('[data-selected-count]');
-                const quantity = cart.get(productId)?.quantity ?? 0;
-                if (quantity > 0) {
-                    badge.classList.remove('hidden');
-                    countEl.textContent = quantity;
-                } else {
-                    badge.classList.add('hidden');
-                }
-            });
-        }
-
-        cartTableBody.addEventListener('click', (event) => {
-            const target = event.target.closest('[data-action]');
-            if (!target) {
+            if (!cartContainer) {
                 return;
             }
-            const productId = Number(target.dataset.id);
-            const action = target.dataset.action;
+            cartContainer.innerHTML = '';
+            let total = 0;
+            cart.forEach((item, productId) => {
+                const product = productCatalog.get(productId);
+                if (!product) {
+                    return;
+                }
+                const lineTotal = item.quantity * product.price;
+                total += lineTotal;
+                const row = document.createElement('div');
+                row.className = 'rounded-2xl border border-slate-200 p-4 bg-slate-50/70';
+                row.innerHTML = `
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="font-semibold text-slate-900">${product.name}</p>
+                            <p class="text-xs text-slate-500">${formatter.format(product.price)} so'm · ${product.unit}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-slate-400">Jami</p>
+                            <p class="text-lg font-semibold text-slate-900">${formatter.format(lineTotal)} so'm</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs text-slate-500">Ombor: ${formatter.format(product.stock)}</span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="h-8 w-8 rounded-full border border-slate-300 text-slate-600 hover:bg-white" data-cart-action="decrease" data-id="${productId}">−</button>
+                            <span class="w-10 text-center font-semibold text-slate-900">${item.quantity}</span>
+                            <button type="button" class="h-8 w-8 rounded-full border border-slate-300 text-slate-600 hover:bg-white" data-cart-action="increase" data-id="${productId}">+</button>
+                        </div>
+                        <button type="button" class="text-xs font-semibold text-rose-600" data-cart-action="remove" data-id="${productId}">O'chirish</button>
+                    </div>
+                `;
+                cartContainer.appendChild(row);
+            });
+            cartTotalEl.textContent = formatter.format(total);
+            emptyCartNotice?.classList.toggle('hidden', cart.size > 0);
+            payloadInput.value = JSON.stringify(Array.from(cart.values()));
+            productCards.forEach((meta, productId) => syncProductCard(productId));
+        }
+
+        function syncProductCard(productId) {
+            const meta = productCards.get(productId);
+            if (!meta) {
+                return;
+            }
+            const quantity = cart.get(productId)?.quantity ?? 0;
+            if (meta.qty) {
+                meta.qty.textContent = quantity;
+            }
+            meta.card.classList.toggle('ring-2', quantity > 0);
+            meta.card.classList.toggle('ring-brand-300', quantity > 0);
+            meta.card.classList.toggle('bg-brand-50/40', quantity > 0);
+            if (meta.minus) {
+                meta.minus.disabled = quantity <= 0;
+            }
+            if (meta.plus) {
+                meta.plus.disabled = meta.stock > 0 && quantity >= meta.stock;
+            }
+        }
+
+        cartContainer?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-cart-action]');
+            if (!button) {
+                return;
+            }
+            const productId = Number(button.dataset.id);
+            const action = button.dataset.cartAction;
             if (!productId) {
                 return;
             }
@@ -752,7 +745,8 @@ render_header('Savdolar');
                 const current = cart.get(productId)?.quantity ?? 0;
                 setQuantity(productId, current - 1);
             } else if (action === 'remove') {
-                removeItem(productId);
+                cart.delete(productId);
+                renderCart();
             }
         });
 
@@ -761,12 +755,13 @@ render_header('Savdolar');
                 const productId = Number(entry.product_id ?? 0);
                 const quantity = Number(entry.quantity ?? 0);
                 if (productId && quantity > 0) {
-                    setQuantity(productId, quantity);
+                    cart.set(productId, { product_id: productId, quantity });
                 }
             });
+            renderCart();
+        } else {
+            renderCart();
         }
-
-        renderCart();
 
         const saleForm = document.getElementById('sale-form');
         saleForm?.addEventListener('submit', () => {
@@ -781,9 +776,9 @@ render_header('Savdolar');
                 if (!selected) {
                     return;
                 }
-                paymentOptions.querySelectorAll('.payment-card').forEach(card => card.classList.remove('active'));
-                selected.classList.add('active');
-                const mode = selected.querySelector('input').value;
+                paymentOptions.querySelectorAll('.payment-card').forEach(card => card.classList.remove('is-active'));
+                selected.classList.add('is-active');
+                const mode = selected.querySelector('input')?.value;
                 if (mode === 'debt') {
                     debtFields.classList.remove('hidden');
                 } else {
@@ -794,6 +789,7 @@ render_header('Savdolar');
     });
 </script>
 <?php endif; ?>
+
 <?php
 render_footer();
 ?>
