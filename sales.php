@@ -210,6 +210,8 @@ if ($recordedSaleId) {
     }
 }
 
+$showWorkspace = isset($_GET['new']) || $_SERVER['REQUEST_METHOD'] === 'POST';
+
 $productClientData = array_map(function (array $product) use ($stockLevels) {
     return [
         'id' => (int)$product['id'],
@@ -311,104 +313,113 @@ render_header('Savdolar');
         </div>
     <?php endif; ?>
 
-    <section class="rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-emerald-50 p-8 shadow-sm">
-        <div class="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-            <div class="space-y-4 max-w-2xl">
-                <div class="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
-                    <?= svg_icon('circle-dashed', 'w-3.5 h-3.5 text-emerald-500') ?>
-                    Real vaqt rejimidagi savdolar
-                </div>
-                <h2 class="text-3xl font-semibold leading-tight text-slate-900">Katalog, chek va to'lovlar bitta sahifada</h2>
-                <p class="text-sm text-slate-600">Butun jarayon kengaytirilgan ishchi maydonda joylashgan — mahsulot tanlash, savat, to'lov va qarzdorlarni boshqarish uchun endi modal oynalarni ochish shart emas.</p>
-                <div class="flex flex-wrap gap-3">
-                    <?php if (empty($products)): ?>
-                        <a href="products.php" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 text-white px-5 py-3 text-sm font-semibold shadow hover:-translate-y-0.5 transition">
-                            <?= svg_icon('plus-circle', 'w-4 h-4') ?>
-                            Mahsulot qo'shish
-                        </a>
-                    <?php else: ?>
-                        <a href="#sale-workspace" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 text-white px-6 py-3 text-sm font-semibold shadow-lg shadow-slate-900/20 hover:-translate-y-0.5 transition">
-                            <?= svg_icon('play', 'w-4 h-4') ?>
-                            Savdoni darhol boshlash
-                        </a>
-                    <?php endif; ?>
-                    <a href="receipts.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-brand-300 transition">
-                        <?= svg_icon('queue-list', 'w-4 h-4') ?>
-                        Cheklar tarixini ko'rish
-                    </a>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full lg:w-[22rem]">
-                <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5">
-                    <p class="text-xs text-slate-400">Bugungi tushum</p>
-                    <p class="mt-2 text-2xl font-semibold text-slate-900"><?= number_format($todayRevenue, 0, '.', ' ') ?> so'm</p>
-                    <p class="text-xs text-emerald-600 inline-flex items-center gap-1 mt-2"><?= svg_icon('activity', 'w-3.5 h-3.5') ?>Live kuzatuv</p>
-                </article>
-                <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5">
-                    <p class="text-xs text-slate-400">Bugungi savdolar</p>
-                    <p class="mt-2 text-2xl font-semibold text-slate-900"><?= number_format($todaySalesCount) ?></p>
-                    <p class="text-xs text-slate-500 mt-2">Cheklar soni</p>
-                </article>
-                <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5 sm:col-span-2">
-                    <p class="text-xs text-slate-400">Qarzdorlik</p>
-                    <div class="flex items-center justify-between mt-2">
-                        <p class="text-2xl font-semibold text-amber-600"><?= number_format($openDebtTotal, 0, '.', ' ') ?> so'm</p>
-                        <div class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Nazorat ostida</div>
+    <?php if (!$showWorkspace): ?>
+        <section class="rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-emerald-50 p-8 shadow-sm">
+            <div class="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+                <div class="space-y-4 max-w-2xl">
+                    <div class="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                        <?= svg_icon('circle-dashed', 'w-3.5 h-3.5 text-emerald-500') ?>
+                        Real vaqt rejimidagi savdolar
                     </div>
-                </article>
+                    <h2 class="text-3xl font-semibold leading-tight text-slate-900">Katalog, chek va to'lovlar alohida sahifada</h2>
+                    <p class="text-sm text-slate-600">“Yangi savdo” tugmasini bosganingizda to'liq ekranli ishchi maydon ochiladi va barcha elementlar bir vaqtning o'zida ko'rinadi.</p>
+                    <div class="flex flex-wrap gap-3">
+                        <?php if (empty($products)): ?>
+                            <a href="products.php" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 text-white px-5 py-3 text-sm font-semibold shadow hover:-translate-y-0.5 transition">
+                                <?= svg_icon('plus-circle', 'w-4 h-4') ?>
+                                Mahsulot qo'shish
+                            </a>
+                        <?php else: ?>
+                            <a href="sales.php?new=1" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 text-white px-6 py-3 text-sm font-semibold shadow-lg shadow-slate-900/20 hover:-translate-y-0.5 transition">
+                                <?= svg_icon('play', 'w-4 h-4') ?>
+                                Yangi savdoni ochish
+                            </a>
+                        <?php endif; ?>
+                        <a href="receipts.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-brand-300 transition">
+                            <?= svg_icon('queue-list', 'w-4 h-4') ?>
+                            Cheklar tarixini ko'rish
+                        </a>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full lg:w-[22rem]">
+                    <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5">
+                        <p class="text-xs text-slate-400">Bugungi tushum</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900"><?= number_format($todayRevenue, 0, '.', ' ') ?> so'm</p>
+                        <p class="text-xs text-emerald-600 inline-flex items-center gap-1 mt-2"><?= svg_icon('activity', 'w-3.5 h-3.5') ?>Live kuzatuv</p>
+                    </article>
+                    <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5">
+                        <p class="text-xs text-slate-400">Bugungi savdolar</p>
+                        <p class="mt-2 text-2xl font-semibold text-slate-900"><?= number_format($todaySalesCount) ?></p>
+                        <p class="text-xs text-slate-500 mt-2">Cheklar soni</p>
+                    </article>
+                    <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5 sm:col-span-2">
+                        <p class="text-xs text-slate-400">Qarzdorlik</p>
+                        <div class="flex items-center justify-between mt-2">
+                            <p class="text-2xl font-semibold text-amber-600"><?= number_format($openDebtTotal, 0, '.', ' ') ?> so'm</p>
+                            <div class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Nazorat ostida</div>
+                        </div>
+                    </article>
+                </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Oy favorit mahsulot</p>
-                    <h3 class="text-xl font-semibold text-slate-900"><?= $topProductName ? htmlspecialchars($topProductName) : "Ma'lumot yo'q" ?></h3>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Oy favorit mahsulot</p>
+                        <h3 class="text-xl font-semibold text-slate-900"><?= $topProductName ? htmlspecialchars($topProductName) : "Ma'lumot yo'q" ?></h3>
+                    </div>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        <?= svg_icon('star', 'w-3.5 h-3.5') ?>
+                        Bestseller
+                    </span>
                 </div>
-                <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                    <?= svg_icon('star', 'w-3.5 h-3.5') ?>
-                    Bestseller
-                </span>
-            </div>
-            <p class="text-3xl font-semibold text-emerald-600"><?= number_format($topProductRevenue, 0, '.', ' ') ?> so'm</p>
-            <p class="text-sm text-slate-500">Oxirgi 30 kun ichida eng ko'p tushum keltirgan mahsulot.</p>
-        </section>
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Eng kam qoldiq</p>
-                    <h3 class="text-xl font-semibold text-rose-600"><?= $lowestStockProduct ? htmlspecialchars($lowestStockProduct['name']) : "Ma'lumot yo'q" ?></h3>
+                <p class="text-3xl font-semibold text-emerald-600"><?= number_format($topProductRevenue, 0, '.', ' ') ?> so'm</p>
+                <p class="text-sm text-slate-500">Oxirgi 30 kun ichida eng ko'p tushum keltirgan mahsulot.</p>
+            </section>
+            <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Eng kam qoldiq</p>
+                        <h3 class="text-xl font-semibold text-rose-600"><?= $lowestStockProduct ? htmlspecialchars($lowestStockProduct['name']) : "Ma'lumot yo'q" ?></h3>
+                    </div>
+                    <?= svg_icon('alert-triangle', 'w-5 h-5 text-rose-500') ?>
                 </div>
-                <?= svg_icon('alert-triangle', 'w-5 h-5 text-rose-500') ?>
-            </div>
-            <p class="text-3xl font-semibold text-slate-900"><?= $lowestStockProduct ? number_format($lowestStockProduct['stock'], 2) . ' ' . htmlspecialchars($lowestStockProduct['unit']) : '' ?></p>
-            <p class="text-sm text-slate-500">Tugab qolmasligi uchun tezda qayta xarid qiling.</p>
-        </section>
-        <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Savdo oynasi</p>
-                    <h3 class="text-xl font-semibold text-slate-900">Interaktiv panel</h3>
+                <p class="text-3xl font-semibold text-slate-900"><?= $lowestStockProduct ? number_format($lowestStockProduct['stock'], 2) . ' ' . htmlspecialchars($lowestStockProduct['unit']) : '' ?></p>
+                <p class="text-sm text-slate-500">Tugab qolmasligi uchun tezda qayta xarid qiling.</p>
+            </section>
+            <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Savdo oynasi</p>
+                        <h3 class="text-xl font-semibold text-slate-900">Interaktiv panel</h3>
+                    </div>
+                    <?= svg_icon('mouse-pointer-click', 'w-5 h-5 text-brand-500') ?>
                 </div>
-                <?= svg_icon('mouse-pointer-click', 'w-5 h-5 text-brand-500') ?>
-            </div>
-            <p class="text-sm text-slate-500">Endi hamma narsa sahifaning o'zida. Quyidagi paneldan foydalansangiz kifoya — qo'shimcha oynalar yo'q.</p>
-            <a href="#sale-workspace" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-2.5 text-sm font-semibold text-brand-700 hover:-translate-y-0.5 transition">
-                <?= svg_icon('sparkles', 'w-4 h-4') ?>
-                Savdoni boshlash
-            </a>
-        </section>
-    </div>
+                <p class="text-sm text-slate-500">Panel endi alohida sahifada ochiladi, shuning uchun kartalar va tanlangan mahsulotlar doim ko'rinadi.</p>
+                <a href="sales.php?new=1" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-2.5 text-sm font-semibold text-brand-700 hover:-translate-y-0.5 transition">
+                    <?= svg_icon('sparkles', 'w-4 h-4') ?>
+                    Yangi savdoni boshlash
+                </a>
+            </section>
+        </div>
+    <?php endif; ?>
 </div>
 
 
-<section id="sale-workspace" class="rounded-3xl border border-slate-200 bg-white/90 p-6 lg:p-8 shadow-sm space-y-6">
-    <div class="flex flex-col gap-1">
-        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Yangi savdo paneli</p>
-        <h3 class="text-2xl font-semibold text-slate-900">Mahsulotlar, savat va to'lovlar yonma-yon</h3>
-        <p class="text-sm text-slate-500">Pastdagi ikki ustunli maket katalogni chapda, savat va to'lovlarni esa o'ngda doimiy ko'rinishda ushlab turadi.</p>
+<?php if ($showWorkspace): ?>
+<section id="sale-workspace" class="rounded-3xl border border-slate-200 bg-white/90 p-6 lg:p-8 shadow-sm space-y-6 mt-8">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Yangi savdo paneli</p>
+            <h3 class="text-2xl font-semibold text-slate-900">Mahsulotlar, savat va to'lovlar yonma-yon</h3>
+            <p class="text-sm text-slate-500">Ushbu sahifa alohida oynada ochildi, shuning uchun tanlangan mahsulotlar bilan to'liq ekranda ishlang.</p>
+        </div>
+        <a href="sales.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <?= svg_icon('arrow-left', 'w-4 h-4') ?>
+            Savdolar bosh sahifasi
+        </a>
     </div>
 
     <?php if (!empty($errors)): ?>
@@ -565,9 +576,21 @@ render_header('Savdolar');
             </div>
         </form>
     <?php endif; ?>
+<?php else: ?>
+<section class="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-10 text-center text-slate-500">
+    <p class="text-sm">Panelni ko'rish uchun "Yangi savdoni boshlash" tugmasini bosing.</p>
 </section>
+<?php endif; ?>
 
-<?php if (!empty($products)): ?>
+<?php if ($showWorkspace && !empty($errors)): ?>
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        document.querySelector('#sale-workspace')?.scrollIntoView({ behavior: 'smooth' });
+    });
+</script>
+<?php endif; ?>
+
+<?php if ($showWorkspace && !empty($products)): ?>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const productCatalog = new Map((<?= $catalogJson ?>).map(item => [Number(item.id), item]));
