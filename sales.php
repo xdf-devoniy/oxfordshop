@@ -279,6 +279,467 @@ foreach ($products as $product) {
     }
 }
 
+if ($showWorkspace) {
+    ?>
+    <!DOCTYPE html>
+    <html lang="uz">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Yangi savdo · Ichimlik va Gazak POS</title>
+        <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            display: ['"Inter"', 'ui-sans-serif', 'system-ui'],
+                        },
+                        colors: {
+                            brand: {
+                                50: '#eff6ff',
+                                100: '#dbeafe',
+                                200: '#bfdbfe',
+                                300: '#93c5fd',
+                                400: '#60a5fa',
+                                500: '#3b82f6',
+                                600: '#2563eb',
+                                700: '#1d4ed8',
+                                800: '#1e40af',
+                                900: '#1e3a8a',
+                            }
+                        }
+                    }
+                }
+            };
+        </script>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    </head>
+    <body class="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 font-display text-slate-900">
+        <div class="min-h-screen flex flex-col">
+            <main class="flex-1">
+                <div class="mx-auto w-full max-w-7xl px-4 lg:px-8 py-6 space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <a href="sales.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                            &larr; Savdolar ro'yxati
+                        </a>
+                        <div class="text-right">
+                            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">To'liq ekran rejimi</p>
+                            <h1 class="text-2xl font-semibold">Yangi savdo oynasi</h1>
+                            <p class="text-sm text-slate-500">Mahsulotlar, savat va to'lovlar bitta sahifada.</p>
+                        </div>
+                    </div>
+
+                    <?php if (!empty($errors)): ?>
+                        <div class="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+                            <ul class="list-disc pl-4 space-y-1">
+                                <?php foreach ($errors as $error): ?>
+                                    <li><?= htmlspecialchars($error) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (empty($products)): ?>
+                        <div class="rounded-3xl border border-dashed border-slate-300 bg-white/70 text-center py-12 text-sm text-slate-500">
+                            Avval mahsulot qo'shing. <a href="products.php" class="text-brand-600 font-semibold">Mahsulotlar</a> sahifasiga o'ting.
+                        </div>
+                    <?php else: ?>
+                        <form method="post" class="space-y-6" id="sale-form">
+                            <input type="hidden" name="cart_payload" id="cart-payload" value='<?= htmlspecialchars($cartJson, ENT_QUOTES, 'UTF-8') ?>'>
+                            <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr),minmax(360px,1fr)]">
+                                <section class="space-y-6">
+                                    <div class="rounded-3xl border border-slate-200 bg-white/80 p-5">
+                                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                            <div>
+                                                <h2 class="text-lg font-semibold">Mahsulot katalogi</h2>
+                                                <p class="text-sm text-slate-500">Kartadagi tugmalar orqali miqdorni boshqaring.</p>
+                                            </div>
+                                            <div class="relative w-full lg:w-72">
+                                                <input type="search" id="product-search" placeholder="Mahsulotni qidiring..." class="w-full rounded-2xl border border-slate-200 bg-white/90 pl-12 pr-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
+                                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                                                    <?= svg_icon('magnifying-glass', 'w-4 h-4') ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 max-h-[65vh] overflow-y-auto pr-1">
+                                            <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                                                <?php foreach ($products as $product): ?>
+                                                    <?php
+                                                        $price = (float)$product['default_price'];
+                                                        $stock = (float)($stockLevels[$product['id']] ?? 0);
+                                                        $disabled = $stock <= 0 || $price <= 0;
+                                                        $searchName = function_exists('mb_strtolower')
+                                                            ? mb_strtolower($product['name'])
+                                                            : strtolower($product['name']);
+                                                    ?>
+                                                    <div class="group flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-brand-300 <?= $disabled ? 'opacity-40 pointer-events-none' : '' ?>"
+                                                         data-product-card
+                                                         data-product-id="<?= (int)$product['id'] ?>"
+                                                         data-product-name="<?= htmlspecialchars($searchName) ?>"
+                                                         data-product-stock="<?= htmlspecialchars(number_format($stock, 2, '.', '')) ?>">
+                                                        <div class="space-y-3">
+                                                            <div class="flex items-start justify-between gap-3">
+                                                                <div class="space-y-1">
+                                                                    <p class="font-semibold leading-snug break-words" title="<?= htmlspecialchars($product['name']) ?>"><?= htmlspecialchars($product['name']) ?></p>
+                                                                    <p class="text-xs text-slate-400"><?= htmlspecialchars($product['unit']) ?></p>
+                                                                </div>
+                                                                <div class="text-right text-sm font-semibold text-brand-600 whitespace-nowrap">
+                                                                    <?= number_format($price, 0, '.', ' ') ?> so'm
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex items-center justify-between text-xs text-slate-500">
+                                                                <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1 font-medium">Ombor: <?= number_format($stock, 2) ?></span>
+                                                                <span class="font-mono">ID: #<?= (int)$product['id'] ?></span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                                                            <div class="flex items-center gap-2">
+                                                                <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="minus">−</button>
+                                                                <span class="w-10 text-center font-semibold" data-product-qty>0</span>
+                                                                <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="plus">+</button>
+                                                            </div>
+                                                            <span class="text-xs text-slate-400">Chekga qo'shish</span>
+                                                        </div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                            <p id="product-empty" class="hidden py-6 text-center text-sm text-slate-400">Natija topilmadi.</p>
+                                        </div>
+                                    </div>
+                                </section>
+                                <aside class="space-y-6 lg:sticky lg:top-8 self-start">
+                                    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <h3 class="text-lg font-semibold">Tanlangan mahsulotlar</h3>
+                                                <p class="text-sm text-slate-500">Chekdagi barcha pozitsiyalar.</p>
+                                            </div>
+                                            <span class="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">Live</span>
+                                        </div>
+                                        <div id="cart-empty" class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center text-sm text-slate-500">
+                                            Savatga hech narsa qo'shilmadi.
+                                        </div>
+                                        <div id="cart-items" class="mt-4 space-y-3"></div>
+                                        <div class="mt-6 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                            <div class="flex items-center justify-between font-semibold text-slate-900">
+                                                <span>Jami:</span>
+                                                <span id="cart-total">0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
+                                        <div>
+                                            <h3 class="text-lg font-semibold">Savdo tafsilotlari</h3>
+                                            <p class="text-sm text-slate-500">Sanani va qaydlarni kiriting.</p>
+                                        </div>
+                                        <label class="space-y-1 text-sm font-medium text-slate-700">
+                                            Savdo sanasi
+                                            <input type="date" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>" class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 focus:border-brand-500 focus:ring-brand-200">
+                                        </label>
+                                        <label class="space-y-1 text-sm font-medium text-slate-700">
+                                            Izoh
+                                            <textarea name="notes" rows="2" class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 focus:border-brand-500 focus:ring-brand-200" placeholder="Istalgan qo'shimcha ma'lumot"><?= htmlspecialchars($notes) ?></textarea>
+                                        </label>
+                                    </div>
+                                    <div class="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
+                                        <div>
+                                            <h3 class="text-lg font-semibold">To'lov holati</h3>
+                                            <p class="text-sm text-slate-500">To'lov turini tanlang.</p>
+                                        </div>
+                                        <div class="grid gap-3" id="payment-options">
+                                            <label class="payment-card <?= $currentMode === 'cash' ? 'is-active' : '' ?>">
+                                                <input type="radio" name="payment_mode" value="cash" <?= $currentMode === 'cash' ? 'checked' : '' ?>>
+                                                <div>
+                                                    <p class="font-semibold">Naqd to'landi</p>
+                                                    <p class="text-xs text-slate-500">To'liq summa kassaga tushadi.</p>
+                                                </div>
+                                            </label>
+                                            <label class="payment-card <?= $currentMode === 'click' ? 'is-active' : '' ?>">
+                                                <input type="radio" name="payment_mode" value="click" <?= $currentMode === 'click' ? 'checked' : '' ?>>
+                                                <div>
+                                                    <p class="font-semibold">Click orqali</p>
+                                                    <p class="text-xs text-slate-500">To'lov kartadan qabul qilinadi.</p>
+                                                </div>
+                                            </label>
+                                            <label class="payment-card <?= $currentMode === 'debt' ? 'is-active' : '' ?>">
+                                                <input type="radio" name="payment_mode" value="debt" <?= $currentMode === 'debt' ? 'checked' : '' ?>>
+                                                <div>
+                                                    <p class="font-semibold">Qarzga berildi</p>
+                                                    <p class="text-xs text-slate-500">Mijoz keyinroq to'laydi.</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <div id="debt-fields" class="space-y-3 <?= $currentMode === 'debt' ? '' : 'hidden' ?>">
+                                            <label class="space-y-1 text-sm font-medium text-slate-700">
+                                                Mavjud mijoz
+                                                <select name="customer_id" class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 focus:border-brand-500 focus:ring-brand-200">
+                                                    <option value="">Tanlanmagan</option>
+                                                    <?php foreach ($customers as $customer): ?>
+                                                        <option value="<?= (int)$customer['id'] ?>" <?= $selectedCustomerId === (int)$customer['id'] ? 'selected' : '' ?>><?= htmlspecialchars($customer['name']) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </label>
+                                            <label class="space-y-1 text-sm font-medium text-slate-700">
+                                                Yangi mijoz nomi
+                                                <input type="text" name="new_customer" value="<?= htmlspecialchars($newCustomerName) ?>" class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 focus:border-brand-500 focus:ring-brand-200" placeholder="Masalan, Azizbek">
+                                            </label>
+                                        </div>
+                                        <button type="submit" class="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white text-sm font-semibold hover:-translate-y-0.5 transition">
+                                            Savdoni saqlash
+                                        </button>
+                                    </div>
+                                </aside>
+                            </div>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </main>
+        </div>
+
+        <style>
+            .payment-card {
+                border: 1px solid rgb(226 232 240);
+                border-radius: 1rem;
+                padding: 1rem;
+                display: flex;
+                gap: 0.75rem;
+                align-items: flex-start;
+                cursor: pointer;
+                background-color: white;
+                transition: all 0.25s ease;
+                box-shadow: inset 0 0 0 0 rgba(59, 130, 246, 0.15);
+            }
+            .payment-card input {
+                display: none;
+            }
+            .payment-card.is-active {
+                border-color: rgb(59 130 246);
+                background-color: rgb(239 246 255);
+                box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
+            }
+        </style>
+
+        <script>
+            const productData = <?= $catalogJson ?>;
+            const productCards = new Map();
+            const productCatalog = new Map();
+            const cart = new Map();
+            const formatter = new Intl.NumberFormat('uz-UZ');
+            const cartContainer = document.getElementById('cart-items');
+            const cartTotalEl = document.getElementById('cart-total');
+            const payloadInput = document.getElementById('cart-payload');
+            const emptyCartNotice = document.getElementById('cart-empty');
+            const productGrid = document.getElementById('product-grid');
+            const productSearch = document.getElementById('product-search');
+            const initialCart = <?= $cartJson ?>;
+
+            if (Array.isArray(productData)) {
+                productData.forEach(product => {
+                    productCatalog.set(product.id, product);
+                });
+            }
+
+            if (productGrid) {
+                productGrid.querySelectorAll('[data-product-card]').forEach(card => {
+                    const productId = Number(card.dataset.productId);
+                    if (!productId) {
+                        return;
+                    }
+                    productCards.set(productId, {
+                        card,
+                        qty: card.querySelector('[data-product-qty]'),
+                        plus: card.querySelector('[data-action="plus"]'),
+                        minus: card.querySelector('[data-action="minus"]'),
+                        stock: Number(card.dataset.productStock ?? 0),
+                    });
+
+                    card.addEventListener('click', (event) => {
+                        const button = event.target.closest('button');
+                        if (!button) {
+                            return;
+                        }
+                        event.preventDefault();
+                        const action = button.dataset.action;
+                        if (action === 'plus') {
+                            const current = cart.get(productId)?.quantity ?? 0;
+                            setQuantity(productId, current + 1);
+                        } else if (action === 'minus') {
+                            const current = cart.get(productId)?.quantity ?? 0;
+                            setQuantity(productId, current - 1);
+                        }
+                    });
+                });
+            }
+
+            function setQuantity(productId, quantity) {
+                if (!productCatalog.has(productId)) {
+                    return;
+                }
+                const product = productCatalog.get(productId);
+                if (quantity <= 0) {
+                    cart.delete(productId);
+                } else {
+                    let allowed = quantity;
+                    if (product.stock > 0 && allowed > product.stock) {
+                        allowed = product.stock;
+                    }
+                    cart.set(productId, { product_id: productId, quantity: Math.round(allowed * 100) / 100 });
+                }
+                renderCart();
+            }
+
+            function renderCart() {
+                if (!cartContainer) {
+                    return;
+                }
+                cartContainer.innerHTML = '';
+                let total = 0;
+                cart.forEach((item, productId) => {
+                    const product = productCatalog.get(productId);
+                    if (!product) {
+                        return;
+                    }
+                    const lineTotal = item.quantity * product.price;
+                    total += lineTotal;
+                    const row = document.createElement('div');
+                    row.className = 'rounded-2xl border border-slate-200 p-4 bg-slate-50/70';
+                    row.innerHTML = `
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-slate-900">${product.name}</p>
+                                <p class="text-xs text-slate-500">${formatter.format(product.price)} so'm · ${product.unit}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-slate-400">Jami</p>
+                                <p class="text-lg font-semibold text-slate-900">${formatter.format(lineTotal)} so'm</p>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                            <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs text-slate-500">Ombor: ${formatter.format(product.stock)}</span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" class="h-8 w-8 rounded-full border border-slate-300 text-slate-600 hover:bg-white" data-cart-action="decrease" data-id="${productId}">−</button>
+                                <span class="w-10 text-center font-semibold text-slate-900">${item.quantity}</span>
+                                <button type="button" class="h-8 w-8 rounded-full border border-slate-300 text-slate-600 hover:bg-white" data-cart-action="increase" data-id="${productId}">+</button>
+                            </div>
+                            <button type="button" class="text-xs font-semibold text-rose-600" data-cart-action="remove" data-id="${productId}">O'chirish</button>
+                        </div>
+                    `;
+                    cartContainer.appendChild(row);
+                });
+                cartTotalEl.textContent = formatter.format(total) + ' so\'m';
+                emptyCartNotice?.classList.toggle('hidden', cart.size > 0);
+                payloadInput.value = JSON.stringify(Array.from(cart.values()));
+                productCards.forEach((meta, productId) => syncProductCard(productId));
+            }
+
+            function syncProductCard(productId) {
+                const meta = productCards.get(productId);
+                if (!meta) {
+                    return;
+                }
+                const quantity = cart.get(productId)?.quantity ?? 0;
+                if (meta.qty) {
+                    meta.qty.textContent = quantity;
+                }
+                meta.card.classList.toggle('ring-2', quantity > 0);
+                meta.card.classList.toggle('ring-brand-300', quantity > 0);
+                meta.card.classList.toggle('bg-brand-50/40', quantity > 0);
+                if (meta.minus) {
+                    meta.minus.disabled = quantity <= 0;
+                }
+                if (meta.plus) {
+                    meta.plus.disabled = meta.stock > 0 && quantity >= meta.stock;
+                }
+            }
+
+            cartContainer?.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-cart-action]');
+                if (!button) {
+                    return;
+                }
+                const productId = Number(button.dataset.id);
+                const action = button.dataset.cartAction;
+                if (!productId) {
+                    return;
+                }
+                if (action === 'increase') {
+                    const current = cart.get(productId)?.quantity ?? 0;
+                    setQuantity(productId, current + 1);
+                } else if (action === 'decrease') {
+                    const current = cart.get(productId)?.quantity ?? 0;
+                    setQuantity(productId, current - 1);
+                } else if (action === 'remove') {
+                    cart.delete(productId);
+                    renderCart();
+                }
+            });
+
+            if (Array.isArray(initialCart)) {
+                initialCart.forEach(entry => {
+                    const productId = Number(entry.product_id ?? 0);
+                    const quantity = Number(entry.quantity ?? 0);
+                    if (productId && quantity > 0) {
+                        cart.set(productId, { product_id: productId, quantity });
+                    }
+                });
+                renderCart();
+            } else {
+                renderCart();
+            }
+
+            const saleForm = document.getElementById('sale-form');
+            saleForm?.addEventListener('submit', () => {
+                payloadInput.value = JSON.stringify(Array.from(cart.values()));
+            });
+
+            const paymentOptions = document.getElementById('payment-options');
+            const debtFields = document.getElementById('debt-fields');
+            if (paymentOptions && debtFields) {
+                paymentOptions.addEventListener('change', (event) => {
+                    const selected = event.target.closest('label');
+                    if (!selected) {
+                        return;
+                    }
+                    paymentOptions.querySelectorAll('label').forEach(label => {
+                        label.classList.remove('is-active');
+                    });
+                    selected.classList.add('is-active');
+                    if (selected.querySelector('input')?.value === 'debt') {
+                        debtFields.classList.remove('hidden');
+                    } else {
+                        debtFields.classList.add('hidden');
+                    }
+                });
+            }
+
+            if (productSearch && productGrid) {
+                productSearch.addEventListener('input', () => {
+                    const query = productSearch.value.trim().toLowerCase();
+                    let visibleCount = 0;
+                    productGrid.querySelectorAll('[data-product-card]').forEach(card => {
+                        const name = card.dataset.productName ?? '';
+                        const match = !query || name.includes(query);
+                        card.classList.toggle('hidden', !match);
+                        if (match) {
+                            visibleCount += 1;
+                        }
+                    });
+                    const empty = document.getElementById('product-empty');
+                    if (empty) {
+                        empty.classList.toggle('hidden', visibleCount > 0);
+                    }
+                });
+            }
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 render_header('Savdolar');
 ?>
 <style>
@@ -407,412 +868,6 @@ render_header('Savdolar');
     <?php endif; ?>
 </div>
 
-
-<?php if ($showWorkspace): ?>
-<section id="sale-workspace" class="rounded-3xl border border-slate-200 bg-white/90 p-6 lg:p-8 shadow-sm space-y-6 mt-8">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Yangi savdo paneli</p>
-            <h3 class="text-2xl font-semibold text-slate-900">Mahsulotlar, savat va to'lovlar yonma-yon</h3>
-            <p class="text-sm text-slate-500">Ushbu sahifa alohida oynada ochildi, shuning uchun tanlangan mahsulotlar bilan to'liq ekranda ishlang.</p>
-        </div>
-        <a href="sales.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            <?= svg_icon('arrow-left', 'w-4 h-4') ?>
-            Savdolar bosh sahifasi
-        </a>
-    </div>
-
-    <?php if (!empty($errors)): ?>
-        <div class="rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 px-5 py-4 text-sm">
-            <ul class="list-disc space-y-1 pl-4">
-                <?php foreach ($errors as $error): ?>
-                    <li><?= htmlspecialchars($error) ?></li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-    <?php endif; ?>
-
-    <?php if (empty($products)): ?>
-        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center py-10 text-sm text-slate-500">
-            Avval mahsulot qo'shing. <a href="products.php" class="text-brand-600 font-semibold">Mahsulotlar</a> sahifasiga o'ting.
-        </div>
-    <?php else: ?>
-        <form method="post" class="space-y-6" id="sale-form">
-            <input type="hidden" name="cart_payload" id="cart-payload" value='<?= htmlspecialchars($cartJson, ENT_QUOTES, 'UTF-8') ?>'>
-            <div class="grid gap-6 xl:grid-cols-[minmax(0,2fr),minmax(320px,1fr)]">
-                <section class="space-y-6">
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
-                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                                <h3 class="text-lg font-semibold text-slate-900">Mahsulot katalogi</h3>
-                                <p class="text-sm text-slate-500">Har bir karta + va − tugmalari bilan boshqariladi.</p>
-                            </div>
-                            <div class="relative w-full lg:w-64">
-                                <input type="search" id="product-search" placeholder="Mahsulotni qidiring..." class="w-full rounded-2xl border border-slate-200 bg-white/80 pl-12 pr-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <?= svg_icon('magnifying-glass', 'w-4 h-4') ?>
-                                </span>
-                            </div>
-                        </div>
-                        <div class="mt-4 max-h-[460px] overflow-y-auto pr-1 lg:max-h-[620px]">
-                            <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                <?php foreach ($products as $product): ?>
-                                    <?php
-                                        $price = (float)$product['default_price'];
-                                        $stock = (float)($stockLevels[$product['id']] ?? 0);
-                                        $disabled = $stock <= 0 || $price <= 0;
-                                        $searchName = function_exists('mb_strtolower')
-                                            ? mb_strtolower($product['name'])
-                                            : strtolower($product['name']);
-                                    ?>
-                                    <div class="group flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-brand-300 <?= $disabled ? 'opacity-40 pointer-events-none' : '' ?>"
-                                         data-product-card
-                                         data-product-id="<?= (int)$product['id'] ?>"
-                                         data-product-name="<?= htmlspecialchars($searchName) ?>"
-                                         data-product-stock="<?= htmlspecialchars(number_format($stock, 2, '.', '')) ?>">
-                                        <div class="space-y-3">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="space-y-1">
-                                                    <p class="font-semibold text-slate-900 leading-snug break-words" title="<?= htmlspecialchars($product['name']) ?>"><?= htmlspecialchars($product['name']) ?></p>
-                                                    <p class="text-xs text-slate-400"><?= htmlspecialchars($product['unit']) ?></p>
-                                                </div>
-                                                <div class="text-right text-sm font-semibold text-brand-600 whitespace-nowrap"><?= number_format($price, 0, '.', ' ') ?> so'm</div>
-                                            </div>
-                                            <div class="flex items-center justify-between text-xs text-slate-500">
-                                                <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1 font-medium">Ombor: <?= number_format($stock, 2) ?></span>
-                                                <span class="font-mono">ID: #<?= (int)$product['id'] ?></span>
-                                            </div>
-                                        </div>
-                                        <div class="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                                            <div class="flex items-center gap-2">
-                                                <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="minus">−</button>
-                                                <span class="w-10 text-center font-semibold text-slate-900" data-product-qty>0</span>
-                                                <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="plus">+</button>
-                                            </div>
-                                            <span class="text-xs text-slate-400">Chekga qo'shish</span>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <p id="product-empty" class="hidden py-6 text-center text-sm text-slate-400">Natija topilmadi.</p>
-                        </div>
-                    </div>
-                </section>
-                <aside class="space-y-6 xl:sticky xl:top-6 self-start">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5">
-                        <div class="flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-slate-900">Tanlangan mahsulotlar</h3>
-                                <p class="text-sm text-slate-500">Chek avtomatik tarzda yangilanadi.</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-xs text-slate-400">Umumiy summa</p>
-                                <p class="text-2xl font-semibold text-slate-900"><span id="cart-total">0</span> so'm</p>
-                            </div>
-                        </div>
-                        <div class="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1" id="cart-items"></div>
-                        <div id="empty-cart" class="rounded-2xl border border-dashed border-slate-200 text-center py-8 text-sm text-slate-400">Mahsulot tanlang va shu yerda paydo bo'ladi.</div>
-                    </div>
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
-                        <div>
-                            <label class="text-sm font-semibold text-slate-700">Savdo sanasi</label>
-                            <input type="date" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200" required>
-                        </div>
-                        <div>
-                            <label class="text-sm font-semibold text-slate-700">Izoh</label>
-                            <textarea name="notes" rows="4" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200" placeholder="Masalan: tushlik savdosi."><?= htmlspecialchars($notes) ?></textarea>
-                        </div>
-                    </div>
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
-                        <div>
-                            <h3 class="text-base font-semibold text-slate-900">To'lov va mijoz</h3>
-                            <p class="text-sm text-slate-500">Qaysi usulda to'lov olindi va agar kerak bo'lsa qarzdor mijozni belgilang.</p>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="payment-options">
-                            <label class="payment-card <?= $currentMode === 'cash' ? 'is-active' : '' ?>">
-                                <input type="radio" name="payment_mode" value="cash" <?= $currentMode === 'cash' ? 'checked' : '' ?>>
-                                <div>
-                                    <p class="font-semibold text-slate-900">Naqd</p>
-                                    <p class="text-xs text-slate-500">To'liq naqd to'lov</p>
-                                </div>
-                            </label>
-                            <label class="payment-card <?= $currentMode === 'click' ? 'is-active' : '' ?>">
-                                <input type="radio" name="payment_mode" value="click" <?= $currentMode === 'click' ? 'checked' : '' ?>>
-                                <div>
-                                    <p class="font-semibold text-slate-900">Click</p>
-                                    <p class="text-xs text-slate-500">Raqamli to'lov</p>
-                                </div>
-                            </label>
-                            <label class="payment-card <?= $currentMode === 'debt' ? 'is-active' : '' ?>">
-                                <input type="radio" name="payment_mode" value="debt" <?= $currentMode === 'debt' ? 'checked' : '' ?>>
-                                <div>
-                                    <p class="font-semibold text-slate-900">Qarz</p>
-                                    <p class="text-xs text-slate-500">To'lov keyin olinadi</p>
-                                </div>
-                            </label>
-                        </div>
-                        <div id="debt-fields" class="<?= $currentMode === 'debt' ? '' : 'hidden' ?> space-y-3">
-                            <div>
-                                <label class="text-sm font-semibold text-slate-700">Mavjud mijoz</label>
-                                <select name="customer_id" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200">
-                                    <option value="0">Tanlanmagan</option>
-                                    <?php foreach ($customers as $customer): ?>
-                                        <option value="<?= (int)$customer['id'] ?>" <?= $selectedCustomerId === (int)$customer['id'] ? 'selected' : '' ?>><?= htmlspecialchars($customer['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-sm font-semibold text-slate-700">Yangi mijoz ismi</label>
-                                <input type="text" name="new_customer" value="<?= htmlspecialchars($newCustomerName) ?>" class="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-brand-200" placeholder="Masalan, Azizbek">
-                                <p class="text-xs text-slate-400 mt-1">Agar mijoz ro'yxatda bo'lmasa, shu yerga kiriting.</p>
-                            </div>
-                        </div>
-                        <div class="pt-4 mt-2 border-t border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <p class="text-xs text-slate-400">Barcha summalar o'zbek so'mida.</p>
-                            <button type="submit" class="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-brand-500 to-emerald-400 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50">Savdoni saqlash</button>
-                        </div>
-                    </div>
-                </aside>
-            </div>
-        </form>
-    <?php endif; ?>
-<?php else: ?>
-<section class="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-10 text-center text-slate-500">
-    <p class="text-sm">Panelni ko'rish uchun "Yangi savdoni boshlash" tugmasini bosing.</p>
-</section>
-<?php endif; ?>
-
-<?php if ($showWorkspace && !empty($errors)): ?>
-<script>
-    window.addEventListener('DOMContentLoaded', () => {
-        document.querySelector('#sale-workspace')?.scrollIntoView({ behavior: 'smooth' });
-    });
-</script>
-<?php endif; ?>
-
-<?php if ($showWorkspace && !empty($products)): ?>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const productCatalog = new Map((<?= $catalogJson ?>).map(item => [Number(item.id), item]));
-        const initialCart = (<?= $cartJson ?>);
-        const cart = new Map();
-        const cartContainer = document.getElementById('cart-items');
-        const cartTotalEl = document.getElementById('cart-total');
-        const emptyCartNotice = document.getElementById('empty-cart');
-        const payloadInput = document.getElementById('cart-payload');
-        const productCards = new Map();
-        const searchInput = document.getElementById('product-search');
-        const productEmptyState = document.getElementById('product-empty');
-        const formatter = new Intl.NumberFormat('uz-UZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-        document.querySelectorAll('[data-product-card]').forEach(card => {
-            const productId = Number(card.dataset.productId);
-            if (!productId) {
-                return;
-            }
-            const meta = {
-                card,
-                minus: card.querySelector('[data-action="minus"]'),
-                plus: card.querySelector('[data-action="plus"]'),
-                qty: card.querySelector('[data-product-qty]'),
-                stock: Number(card.dataset.productStock ?? '0'),
-                disabled: card.classList.contains('pointer-events-none')
-            };
-            productCards.set(productId, meta);
-
-            meta.plus?.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                if (meta.disabled) {
-                    return;
-                }
-                const current = cart.get(productId)?.quantity ?? 0;
-                setQuantity(productId, current + 1);
-            });
-
-            meta.minus?.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                if (meta.disabled) {
-                    return;
-                }
-                const current = cart.get(productId)?.quantity ?? 0;
-                setQuantity(productId, current - 1);
-            });
-
-            card.addEventListener('click', (event) => {
-                if (meta.disabled || event.target.closest('[data-action]')) {
-                    return;
-                }
-                const current = cart.get(productId)?.quantity ?? 0;
-                setQuantity(productId, current + 1);
-            });
-        });
-
-        const filterProducts = () => {
-            const query = (searchInput?.value ?? '').toLowerCase().trim();
-            let visibleCount = 0;
-            productCards.forEach((meta) => {
-                const haystack = meta.card.dataset.productName ?? '';
-                const isVisible = haystack.includes(query);
-                meta.card.classList.toggle('hidden', !isVisible);
-                if (isVisible) {
-                    visibleCount += 1;
-                }
-            });
-            if (productEmptyState) {
-                productEmptyState.classList.toggle('hidden', visibleCount > 0);
-            }
-        };
-        searchInput?.addEventListener('input', filterProducts);
-        filterProducts();
-
-        function setQuantity(productId, quantity) {
-            if (!productCatalog.has(productId)) {
-                return;
-            }
-            const product = productCatalog.get(productId);
-            const meta = productCards.get(productId);
-            if (meta?.disabled) {
-                return;
-            }
-            if (quantity <= 0) {
-                cart.delete(productId);
-            } else {
-                let allowed = quantity;
-                if (product.stock > 0 && allowed > product.stock) {
-                    allowed = product.stock;
-                }
-                cart.set(productId, { product_id: productId, quantity: Math.round(allowed * 100) / 100 });
-            }
-            renderCart();
-        }
-
-        function renderCart() {
-            if (!cartContainer) {
-                return;
-            }
-            cartContainer.innerHTML = '';
-            let total = 0;
-            cart.forEach((item, productId) => {
-                const product = productCatalog.get(productId);
-                if (!product) {
-                    return;
-                }
-                const lineTotal = item.quantity * product.price;
-                total += lineTotal;
-                const row = document.createElement('div');
-                row.className = 'rounded-2xl border border-slate-200 p-4 bg-slate-50/70';
-                row.innerHTML = `
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <p class="font-semibold text-slate-900">${product.name}</p>
-                            <p class="text-xs text-slate-500">${formatter.format(product.price)} so'm · ${product.unit}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xs text-slate-400">Jami</p>
-                            <p class="text-lg font-semibold text-slate-900">${formatter.format(lineTotal)} so'm</p>
-                        </div>
-                    </div>
-                    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs text-slate-500">Ombor: ${formatter.format(product.stock)}</span>
-                        <div class="flex items-center gap-2">
-                            <button type="button" class="h-8 w-8 rounded-full border border-slate-300 text-slate-600 hover:bg-white" data-cart-action="decrease" data-id="${productId}">−</button>
-                            <span class="w-10 text-center font-semibold text-slate-900">${item.quantity}</span>
-                            <button type="button" class="h-8 w-8 rounded-full border border-slate-300 text-slate-600 hover:bg-white" data-cart-action="increase" data-id="${productId}">+</button>
-                        </div>
-                        <button type="button" class="text-xs font-semibold text-rose-600" data-cart-action="remove" data-id="${productId}">O'chirish</button>
-                    </div>
-                `;
-                cartContainer.appendChild(row);
-            });
-            cartTotalEl.textContent = formatter.format(total);
-            emptyCartNotice?.classList.toggle('hidden', cart.size > 0);
-            payloadInput.value = JSON.stringify(Array.from(cart.values()));
-            productCards.forEach((meta, productId) => syncProductCard(productId));
-        }
-
-        function syncProductCard(productId) {
-            const meta = productCards.get(productId);
-            if (!meta) {
-                return;
-            }
-            const quantity = cart.get(productId)?.quantity ?? 0;
-            if (meta.qty) {
-                meta.qty.textContent = quantity;
-            }
-            meta.card.classList.toggle('ring-2', quantity > 0);
-            meta.card.classList.toggle('ring-brand-300', quantity > 0);
-            meta.card.classList.toggle('bg-brand-50/40', quantity > 0);
-            if (meta.minus) {
-                meta.minus.disabled = quantity <= 0;
-            }
-            if (meta.plus) {
-                meta.plus.disabled = meta.stock > 0 && quantity >= meta.stock;
-            }
-        }
-
-        cartContainer?.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-cart-action]');
-            if (!button) {
-                return;
-            }
-            const productId = Number(button.dataset.id);
-            const action = button.dataset.cartAction;
-            if (!productId) {
-                return;
-            }
-            if (action === 'increase') {
-                const current = cart.get(productId)?.quantity ?? 0;
-                setQuantity(productId, current + 1);
-            } else if (action === 'decrease') {
-                const current = cart.get(productId)?.quantity ?? 0;
-                setQuantity(productId, current - 1);
-            } else if (action === 'remove') {
-                cart.delete(productId);
-                renderCart();
-            }
-        });
-
-        if (Array.isArray(initialCart)) {
-            initialCart.forEach(entry => {
-                const productId = Number(entry.product_id ?? 0);
-                const quantity = Number(entry.quantity ?? 0);
-                if (productId && quantity > 0) {
-                    cart.set(productId, { product_id: productId, quantity });
-                }
-            });
-            renderCart();
-        } else {
-            renderCart();
-        }
-
-        const saleForm = document.getElementById('sale-form');
-        saleForm?.addEventListener('submit', () => {
-            payloadInput.value = JSON.stringify(Array.from(cart.values()));
-        });
-
-        const paymentOptions = document.getElementById('payment-options');
-        const debtFields = document.getElementById('debt-fields');
-        if (paymentOptions && debtFields) {
-            paymentOptions.addEventListener('change', (event) => {
-                const selected = event.target.closest('label');
-                if (!selected) {
-                    return;
-                }
-                paymentOptions.querySelectorAll('.payment-card').forEach(card => card.classList.remove('is-active'));
-                selected.classList.add('is-active');
-                const mode = selected.querySelector('input')?.value;
-                if (mode === 'debt') {
-                    debtFields.classList.remove('hidden');
-                } else {
-                    debtFields.classList.add('hidden');
-                }
-            });
-        }
-    });
-</script>
-<?php endif; ?>
 
 <?php
 render_footer();
