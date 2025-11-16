@@ -12,11 +12,12 @@ function periodMetrics(PDO $pdo, string $start, string $end): array
         JOIN sales s ON s.id = si.sale_id
         WHERE s.sale_date BETWEEN ? AND ?', [$start, $end]);
 
-    $salesByProduct = fetchAll($pdo, 'SELECT si.product_id, SUM(si.quantity) AS quantity, SUM(si.total) AS revenue
+    $salesByProduct = fetchAll($pdo, 'SELECT si.product_id, p.name, p.unit, SUM(si.quantity) AS quantity, SUM(si.total) AS revenue
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
+        JOIN products p ON p.id = si.product_id
         WHERE s.sale_date BETWEEN ? AND ?
-        GROUP BY si.product_id', [$start, $end]);
+        GROUP BY si.product_id, p.name, p.unit', [$start, $end]);
 
     $cogs = 0;
     $productCosts = [];
@@ -147,45 +148,84 @@ $dailyTrend = fetchAll($pdo, 'SELECT s.sale_date AS day, SUM(si.total) AS revenu
     GROUP BY s.sale_date
     ORDER BY s.sale_date', [$start, $end]);
 
-$topProducts = [];
+$perProductBreakdown = [];
 foreach ($current['sales_by_product'] as $row) {
-    $profit = (float)$row['revenue'] - ($current['product_costs'][$row['product_id']] ?? 0);
-    $product = fetchOne($pdo, 'SELECT name FROM products WHERE id = ?', [$row['product_id']]);
-    $topProducts[] = [
-        'name' => $product['name'] ?? 'Noma\'lum',
-        'revenue' => (float)$row['revenue'],
-        'profit' => $profit,
+    $cost = $current['product_costs'][$row['product_id']] ?? 0;
+    $perProductBreakdown[] = [
+        'name' => $row['name'] ?? 'Noma\'lum',
+        'unit' => $row['unit'] ?? '',
         'quantity' => (float)$row['quantity'],
+        'revenue' => (float)$row['revenue'],
+        'cost' => $cost,
+        'profit' => (float)$row['revenue'] - $cost,
     ];
 }
+usort($perProductBreakdown, fn($a, $b) => $b['profit'] <=> $a['profit']);
 
-usort($topProducts, fn($a, $b) => $b['profit'] <=> $a['profit']);
-$topProducts = array_slice($topProducts, 0, 10);
+$potentialStock = fetchAll($pdo, 'SELECT p.id, p.name, p.unit, p.default_price,
+    IFNULL((SELECT SUM(quantity) FROM purchases WHERE product_id = p.id),0) +
+    IFNULL((SELECT SUM(quantity_change) FROM adjustments WHERE product_id = p.id),0) -
+    IFNULL((SELECT SUM(quantity) FROM sale_items WHERE product_id = p.id),0) AS stock
+    FROM products p
+    ORDER BY p.name');
+
+$potentialProducts = [];
+$potentialTotalProfit = 0.0;
+foreach ($potentialStock as $row) {
+    $stockQty = (float)$row['stock'];
+    if ($stockQty <= 0) {
+        continue;
+    }
+    $purchaseTotals = fetchOne($pdo, 'SELECT SUM(quantity * unit_cost) AS cost, SUM(quantity) AS qty FROM purchases WHERE product_id = ?', [$row['id']]);
+    $cost = (float)($purchaseTotals['cost'] ?? 0);
+    $qty = (float)($purchaseTotals['qty'] ?? 0);
+    $avgCost = $qty > 0 ? $cost / $qty : 0;
+    $potentialRevenue = $stockQty * (float)$row['default_price'];
+    $potentialCost = $stockQty * $avgCost;
+    $potentialProfit = $potentialRevenue - $potentialCost;
+    $potentialProducts[] = [
+        'name' => $row['name'],
+        'unit' => $row['unit'],
+        'stock' => $stockQty,
+        'potential_revenue' => $potentialRevenue,
+        'potential_profit' => $potentialProfit,
+    ];
+    $potentialTotalProfit += $potentialProfit;
+}
+usort($potentialProducts, fn($a, $b) => $b['potential_profit'] <=> $a['potential_profit']);
 
 render_header('Foyda paneli');
 ?>
-<div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
-    <form method="get" class="flex flex-wrap gap-3 text-sm items-end">
+<div class="rounded-3xl border border-slate-200 bg-white p-6 mb-8">
+    <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-            <label class="block text-slate-600">Rejim</label>
-            <select name="mode" class="mt-1 border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
-                <option value="current" <?= $mode === 'current' ? 'selected' : '' ?>>Joriy oy</option>
-                <option value="previous" <?= $mode === 'previous' ? 'selected' : '' ?>>O'tgan oy</option>
-                <option value="custom" <?= $mode === 'custom' ? 'selected' : '' ?>>Tanlangan davr</option>
-            </select>
+            <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Davr filtri</p>
+            <h2 class="text-3xl font-semibold text-slate-900">Sotuvdan foyda va potensialni kuzating</h2>
+            <p class="text-sm text-slate-500">Har bir mahsulot bo'yicha foyda va qolgan zaxiradan olinadigan potensial daromadni ko'ring.</p>
         </div>
-        <div>
-            <label class="block text-slate-600">Boshlanish</label>
-            <input type="date" name="start" value="<?= htmlspecialchars($start) ?>" class="mt-1 border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
-        </div>
-        <div>
-            <label class="block text-slate-600">Tugash</label>
-            <input type="date" name="end" value="<?= htmlspecialchars($end) ?>" class="mt-1 border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-slate-400">
-        </div>
-        <div>
-            <button type="submit" class="inline-flex items-center px-4 py-2 bg-slate-900 text-white rounded-md">Yangilash</button>
-        </div>
-    </form>
+        <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+            <label class="space-y-1">
+                <span class="text-slate-500">Rejim</span>
+                <select name="mode" class="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-brand-400 focus:ring-brand-200">
+                    <option value="current" <?= $mode === 'current' ? 'selected' : '' ?>>Joriy oy</option>
+                    <option value="previous" <?= $mode === 'previous' ? 'selected' : '' ?>>O'tgan oy</option>
+                    <option value="custom" <?= $mode === 'custom' ? 'selected' : '' ?>>Tanlangan davr</option>
+                </select>
+            </label>
+            <label class="space-y-1">
+                <span class="text-slate-500">Boshlanish</span>
+                <input type="date" name="start" value="<?= htmlspecialchars($start) ?>" class="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-brand-400 focus:ring-brand-200">
+            </label>
+            <label class="space-y-1">
+                <span class="text-slate-500">Tugash</span>
+                <input type="date" name="end" value="<?= htmlspecialchars($end) ?>" class="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-brand-400 focus:ring-brand-200">
+            </label>
+            <div class="flex items-end gap-2">
+                <button type="submit" class="w-full inline-flex items-center justify-center rounded-xl bg-brand-600 text-white font-semibold px-4 py-2">Yangilash</button>
+                <a href="profit.php" class="w-full inline-flex items-center justify-center rounded-xl border border-slate-200 text-slate-600 px-4 py-2">Tozalash</a>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -270,35 +310,84 @@ render_header('Foyda paneli');
     </div>
 </div>
 
-<div class="bg-white border border-slate-200 rounded-lg p-5 mt-6">
-    <h3 class="text-lg font-semibold text-slate-800 mb-3">Foyda bo'yicha eng yaxshi mahsulotlar</h3>
+<section class="bg-white border border-slate-200 rounded-lg p-5 mt-6 space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <h3 class="text-lg font-semibold text-slate-800">Har biri · mahsulotlar bo'yicha foyda</h3>
+            <p class="text-sm text-slate-500">Tanlangan davrda sotilgan barcha mahsulotlar bo'yicha tushum va COGS.</p>
+        </div>
+        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            <?= count($perProductBreakdown) ?> ta mahsulot
+        </span>
+    </div>
     <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead>
                 <tr class="text-left text-xs uppercase text-slate-500">
                     <th class="pb-2">Mahsulot</th>
-                    <th class="pb-2">Miqdor</th>
+                    <th class="pb-2">Sotildi</th>
                     <th class="pb-2">Tushum</th>
+                    <th class="pb-2">COGS</th>
                     <th class="pb-2">Foyda</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-                <?php if (empty($topProducts)): ?>
-                    <tr><td colspan="4" class="py-6 text-center text-slate-400">Foydali mahsulotlar topilmadi.</td></tr>
+                <?php if (empty($perProductBreakdown)): ?>
+                    <tr><td colspan="5" class="py-6 text-center text-slate-400">Ushbu davrda savdolar mavjud emas.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($topProducts as $product): ?>
+                    <?php foreach ($perProductBreakdown as $row): ?>
                         <tr>
-                            <td class="py-2 text-slate-700"><?= htmlspecialchars($product['name']) ?></td>
-                            <td class="py-2 text-slate-600"><?= number_format($product['quantity'], 2) ?></td>
-                            <td class="py-2 text-slate-800"><?= number_format($product['revenue'], 2) ?> so'm</td>
-                            <td class="py-2 text-emerald-600"><?= number_format($product['profit'], 2) ?> so'm</td>
+                            <td class="py-2 text-slate-700"><?= htmlspecialchars($row['name']) ?></td>
+                            <td class="py-2 text-slate-600"><?= number_format($row['quantity'], 2) ?> <?= htmlspecialchars($row['unit']) ?></td>
+                            <td class="py-2 text-slate-800"><?= number_format($row['revenue'], 2) ?> so'm</td>
+                            <td class="py-2 text-slate-500"><?= number_format($row['cost'], 2) ?> so'm</td>
+                            <td class="py-2 font-semibold <?= $row['profit'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>"><?= number_format($row['profit'], 2) ?> so'm</td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
-</div>
+</section>
+
+<section class="bg-white border border-slate-200 rounded-lg p-5 mt-6 space-y-4">
+    <div class="flex items-center justify-between">
+        <div>
+            <h3 class="text-lg font-semibold text-slate-800">Potential · ombordagi foyda</h3>
+            <p class="text-sm text-slate-500">Hozirgi qoldiq to'liq sotilsa olinadigan taxminiy foyda.</p>
+        </div>
+        <div class="text-right">
+            <p class="text-xs text-slate-500">Jami potensial</p>
+            <p class="text-2xl font-semibold text-brand-600"><?= number_format($potentialTotalProfit, 2) ?> so'm</p>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead>
+                <tr class="text-left text-xs uppercase text-slate-500">
+                    <th class="pb-2">Mahsulot</th>
+                    <th class="pb-2">Qoldiq</th>
+                    <th class="pb-2">Potensial tushum</th>
+                    <th class="pb-2">Potensial foyda</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                <?php if (empty($potentialProducts)): ?>
+                    <tr><td colspan="4" class="py-6 text-center text-slate-400">Omborda foyda keltiruvchi mahsulot topilmadi.</td></tr>
+                <?php else: ?>
+                    <?php foreach (array_slice($potentialProducts, 0, 12) as $row): ?>
+                        <tr>
+                            <td class="py-2 text-slate-700"><?= htmlspecialchars($row['name']) ?></td>
+                            <td class="py-2 text-slate-600"><?= number_format($row['stock'], 2) ?> <?= htmlspecialchars($row['unit']) ?></td>
+                            <td class="py-2 text-slate-800"><?= number_format($row['potential_revenue'], 2) ?> so'm</td>
+                            <td class="py-2 font-semibold text-emerald-600"><?= number_format($row['potential_profit'], 2) ?> so'm</td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
 <?php
 render_footer();
 ?>

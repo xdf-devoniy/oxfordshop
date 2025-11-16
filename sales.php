@@ -291,18 +291,19 @@ render_header('Savdolar');
         align-items: flex-start;
         cursor: pointer;
         background-color: white;
-        transition: all 0.2s ease;
+        transition: all 0.25s ease;
+        box-shadow: inset 0 0 0 0 rgba(59, 130, 246, 0.15);
     }
     .payment-card input {
         display: none;
     }
     .payment-card.is-active {
-        border-color: rgb(20 184 166);
-        background-color: rgb(236 253 245);
-        box-shadow: 0 20px 45px -25px rgba(15, 118, 110, 0.45);
+        border-color: rgb(59 130 246);
+        background-color: rgb(239 246 255);
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
     }
 </style>
-<div class="space-y-6">
+<div class="space-y-8">
     <?php if ($success): ?>
         <div class="rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 flex items-center justify-between gap-4">
             <span><?= htmlspecialchars($success) ?></span>
@@ -312,70 +313,108 @@ render_header('Savdolar');
         </div>
     <?php endif; ?>
 
+    <section class="rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-sky-50 to-emerald-50 p-8 shadow-sm">
+        <div class="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+            <div class="space-y-4 max-w-2xl">
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                    <i data-lucide="circle-dashed" class="w-3.5 h-3.5 text-emerald-500"></i>
+                    Real vaqt rejimidagi savdolar
+                </div>
+                <h2 class="text-3xl font-semibold leading-tight text-slate-900">Katalog, chek va to'lovlar bitta modal oynada</h2>
+                <p class="text-sm text-slate-600">Mahsulotni tanlang, miqdorni +/− bilan sozlang va darhol naqd, Click yoki qarzga yozing. Hech qanday qo'shimcha sahifa yoki ortiqcha forma yo'q.</p>
+                <div class="flex flex-wrap gap-3">
+                    <?php if (empty($products)): ?>
+                        <a href="products.php" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 text-white px-5 py-3 text-sm font-semibold shadow hover:-translate-y-0.5 transition">
+                            <span class="iconify" data-icon="heroicons-outline:plus-circle"></span>
+                            Mahsulot qo'shish
+                        </a>
+                    <?php else: ?>
+                        <button type="button" id="open-sale-modal" class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 text-white px-6 py-3 text-sm font-semibold shadow-lg shadow-slate-900/20 hover:-translate-y-0.5 transition">
+                            <span class="iconify" data-icon="heroicons-outline:play"></span>
+                            Yangi savdo oynasini ochish
+                        </button>
+                    <?php endif; ?>
+                    <a href="receipts.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-brand-300 transition">
+                        <span class="iconify" data-icon="heroicons-outline:queue-list"></span>
+                        Cheklar tarixini ko'rish
+                    </a>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full lg:w-[22rem]">
+                <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5">
+                    <p class="text-xs text-slate-400">Bugungi tushum</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900"><?= number_format($todayRevenue, 0, '.', ' ') ?> so'm</p>
+                    <p class="text-xs text-emerald-600 inline-flex items-center gap-1 mt-2"><i data-lucide="activity" class="w-3.5 h-3.5"></i>Live kuzatuv</p>
+                </article>
+                <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5">
+                    <p class="text-xs text-slate-400">Bugungi savdolar</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900"><?= number_format($todaySalesCount) ?></p>
+                    <p class="text-xs text-slate-500 mt-2">Cheklar soni</p>
+                </article>
+                <article class="rounded-2xl bg-white border border-white/60 shadow-inner px-4 py-5 sm:col-span-2">
+                    <p class="text-xs text-slate-400">Qarzdorlik</p>
+                    <div class="flex items-center justify-between mt-2">
+                        <p class="text-2xl font-semibold text-amber-600"><?= number_format($openDebtTotal, 0, '.', ' ') ?> so'm</p>
+                        <div class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Nazorat ostida</div>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section class="lg:col-span-2 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-8 relative overflow-hidden">
-            <div class="absolute inset-y-0 right-0 w-2/3 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.35),_transparent_65%)] opacity-60 pointer-events-none"></div>
-            <div class="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div class="space-y-4 max-w-xl">
-                    <p class="text-xs uppercase tracking-[0.4em] text-white/60">Savdo rejimi</p>
-                    <h2 class="text-3xl font-semibold leading-tight">Mahsulotlarni tez tanlang va savdoni yakunlang</h2>
-                    <p class="text-sm text-white/70">Modal oynada katalog, savdo cheki va mijoz ma'lumotlari bir joyda jamlangan.</p>
-                    <div class="flex flex-wrap gap-3">
-                        <?php if (empty($products)): ?>
-                            <a href="products.php" class="inline-flex items-center rounded-full bg-white/10 px-5 py-2 text-sm font-semibold text-white hover:bg-white/20">Avval mahsulot qo'shing</a>
-                        <?php else: ?>
-                            <button type="button" id="open-sale-modal" class="inline-flex items-center rounded-full bg-white text-slate-900 px-6 py-3 text-sm font-semibold shadow-lg shadow-slate-900/40 hover:-translate-y-0.5 transition">Yangi savdo</button>
-                        <?php endif; ?>
-                        <a href="receipts.php" class="inline-flex items-center rounded-full border border-white/40 px-5 py-2 text-sm font-semibold text-white/80 hover:text-white">Cheklar tarixi</a>
-                    </div>
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Oy favorit mahsulot</p>
+                    <h3 class="text-xl font-semibold text-slate-900"><?= $topProductName ? htmlspecialchars($topProductName) : "Ma'lumot yo'q" ?></h3>
                 </div>
-                <div class="grid grid-cols-2 gap-4 w-full lg:w-72">
-                    <div class="rounded-2xl bg-white/10 p-4">
-                        <p class="text-xs text-white/60">Bugungi tushum</p>
-                        <p class="mt-2 text-2xl font-semibold"><?= number_format($todayRevenue, 0, '.', ' ') ?> so'm</p>
-                    </div>
-                    <div class="rounded-2xl bg-white/10 p-4">
-                        <p class="text-xs text-white/60">Bugun savdolar</p>
-                        <p class="mt-2 text-2xl font-semibold"><?= number_format($todaySalesCount) ?></p>
-                    </div>
-                    <div class="col-span-2 rounded-2xl bg-white/10 p-4">
-                        <p class="text-xs text-white/60">Qarzdorlik</p>
-                        <p class="mt-2 text-2xl font-semibold text-amber-200"><?= number_format($openDebtTotal, 0, '.', ' ') ?> so'm</p>
-                    </div>
-                </div>
+                <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    <i data-lucide="star" class="w-3.5 h-3.5"></i>
+                    Bestseller
+                </span>
             </div>
+            <p class="text-3xl font-semibold text-emerald-600"><?= number_format($topProductRevenue, 0, '.', ' ') ?> so'm</p>
+            <p class="text-sm text-slate-500">Oxirgi 30 kun ichida eng ko'p tushum keltirgan mahsulot.</p>
         </section>
-        <section class="rounded-3xl border border-white/10 bg-white/90 backdrop-blur p-6 space-y-4 text-slate-900">
-            <div>
-                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Analitika</p>
-                <h3 class="text-xl font-semibold">Tezkor ko'rsatkichlar</h3>
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Eng kam qoldiq</p>
+                    <h3 class="text-xl font-semibold text-rose-600"><?= $lowestStockProduct ? htmlspecialchars($lowestStockProduct['name']) : "Ma'lumot yo'q" ?></h3>
+                </div>
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500"></i>
             </div>
-            <div class="space-y-3 text-sm">
-                <div class="flex items-center justify-between">
-                    <span class="text-slate-500">Oy favorit mahsulot</span>
-                    <span class="font-semibold text-slate-900"><?= $topProductName ? htmlspecialchars($topProductName) : "Ma'lumot yo'q" ?></span>
+            <p class="text-3xl font-semibold text-slate-900"><?= $lowestStockProduct ? number_format($lowestStockProduct['stock'], 2) . ' ' . htmlspecialchars($lowestStockProduct['unit']) : '' ?></p>
+            <p class="text-sm text-slate-500">Tugab qolmasligi uchun tezda qayta xarid qiling.</p>
+        </section>
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Savdo oynasi</p>
+                    <h3 class="text-xl font-semibold text-slate-900">Modal boshqaruv</h3>
                 </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-slate-500">Oy bo'yicha tushum</span>
-                    <span class="font-semibold text-emerald-600"><?= number_format($topProductRevenue, 0, '.', ' ') ?> so'm</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-slate-500">Eng kam qoldiq</span>
-                    <span class="font-semibold text-rose-600"><?= $lowestStockProduct ? htmlspecialchars($lowestStockProduct['name']) . ' · ' . number_format($lowestStockProduct['stock'], 2) . ' ' . htmlspecialchars($lowestStockProduct['unit']) : "Ma'lumot yo'q" ?></span>
-                </div>
+                <i data-lucide="mouse-pointer-click" class="w-5 h-5 text-brand-500"></i>
             </div>
+            <p class="text-sm text-slate-500">Mahsulot tanlash, to'lov va qarzdorlikni bir joyda boshqarish uchun «Yangi savdo» tugmasini bosing.</p>
+            <button type="button" id="open-sale-modal-secondary" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-2.5 text-sm font-semibold text-brand-700 hover:-translate-y-0.5 transition">
+                <span class="iconify" data-icon="heroicons-outline:sparkles"></span>
+                Savdoni boshlash
+            </button>
         </section>
     </div>
 </div>
 
-<div id="sale-modal" class="fixed inset-0 z-40 <?= $shouldOpenSaleModal ? '' : 'hidden' ?> bg-slate-950/70 backdrop-blur-sm px-4 py-8 flex items-start justify-center" data-open-initial="<?= $shouldOpenSaleModal ? '1' : '0' ?>">
-    <div class="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div class="flex items-center justify-between border-b border-slate-200 px-8 py-5">
+<div id="sale-modal" class="fixed inset-0 z-40 <?= $shouldOpenSaleModal ? '' : 'hidden' ?> bg-slate-900/40 backdrop-blur-sm px-4 py-8 flex items-start justify-center" data-open-initial="<?= $shouldOpenSaleModal ? '1' : '0' ?>">
+    <div class="relative w-full max-w-6xl bg-white rounded-[32px] shadow-2xl flex flex-col max-h-[92vh]">
+        <div class="flex items-center justify-between border-b border-slate-200 px-8 py-6">
             <div>
-                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Yangi savdo</p>
-                <h3 class="text-2xl font-semibold text-slate-900">Modal savdo oynasi</h3>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Yangi savdo</p>
+                <h3 class="text-2xl font-semibold text-slate-900">Interaktiv modal oynasi</h3>
             </div>
-            <button type="button" class="h-10 w-10 rounded-full border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center" id="close-sale-modal">&times;</button>
+            <button type="button" class="h-11 w-11 rounded-2xl border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center" id="close-sale-modal">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
         </div>
         <div class="flex-1 overflow-y-auto px-8 py-6">
             <?php if (!empty($errors)): ?>
@@ -404,8 +443,10 @@ render_header('Savdolar');
                                         <p class="text-sm text-slate-500">Har bir karta + va − tugmalari bilan boshqariladi.</p>
                                     </div>
                                     <div class="relative w-full lg:w-64">
-                                        <input type="search" id="product-search" placeholder="Mahsulotni qidiring..." class="w-full rounded-2xl border border-slate-200 bg-white/80 pl-11 pr-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
-                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+                                        <input type="search" id="product-search" placeholder="Mahsulotni qidiring..." class="w-full rounded-2xl border border-slate-200 bg-white/80 pl-12 pr-4 py-2.5 text-sm text-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                                            <span class="iconify" data-icon="heroicons-outline:magnifying-glass"></span>
+                                        </span>
                                     </div>
                                 </div>
                                 <div class="mt-4 max-h-[360px] overflow-y-auto pr-1">
@@ -531,6 +572,7 @@ render_header('Savdolar');
     document.addEventListener('DOMContentLoaded', () => {
         const saleModal = document.getElementById('sale-modal');
         const openButton = document.getElementById('open-sale-modal');
+        const secondaryOpenButton = document.getElementById('open-sale-modal-secondary');
         const closeButton = document.getElementById('close-sale-modal');
 
         const toggleBodyScroll = (isOpen) => {
@@ -543,6 +585,9 @@ render_header('Savdolar');
             }
             saleModal.classList.remove('hidden');
             toggleBodyScroll(true);
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
         };
 
         const closeSaleModal = () => {
@@ -554,6 +599,7 @@ render_header('Savdolar');
         };
 
         openButton?.addEventListener('click', openSaleModal);
+        secondaryOpenButton?.addEventListener('click', openSaleModal);
         closeButton?.addEventListener('click', closeSaleModal);
         saleModal?.addEventListener('click', (event) => {
             if (event.target === saleModal) {

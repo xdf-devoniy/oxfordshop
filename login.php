@@ -49,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     </script>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 flex items-center justify-center px-4 py-10">
-    <div class="max-w-md w-full bg-white/95 backdrop-blur shadow-2xl rounded-2xl p-8 space-y-6">
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 flex items-center justify-center px-4 py-10">
+    <div class="max-w-md w-full bg-white shadow-xl rounded-3xl p-8 space-y-6 border border-slate-100">
         <div class="text-center space-y-2">
             <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Ichimlik & Gazak POS</p>
             <h1 class="text-3xl font-semibold text-slate-900">Tizimga kirish</h1>
@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        class="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-slate-800 focus:border-brand-500 focus:ring-brand-500/40">
             </div>
             <button type="submit"
-                    class="w-full inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-500 to-emerald-400 text-white font-semibold py-3 shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 transition">
+                    class="w-full inline-flex items-center justify-center rounded-xl bg-brand-600 text-white font-semibold py-3 shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 transition">
                 Kirish
             </button>
         </form>

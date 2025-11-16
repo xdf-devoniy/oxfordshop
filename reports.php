@@ -41,6 +41,7 @@ $paymentsByMethod = fetchAll($pdo, 'SELECT payment_method, IFNULL(SUM(amount),0)
 $orderSummary = fetchOne($pdo, 'SELECT COUNT(*) AS order_count FROM sales WHERE sale_date BETWEEN ? AND ?', [$start, $end]);
 $orderCount = (int)($orderSummary['order_count'] ?? 0);
 $averageOrder = $orderCount > 0 ? $revenue / $orderCount : 0;
+$unitsPerSale = $orderCount > 0 ? $unitsSold / $orderCount : 0;
 
 $cashTotal = 0.0;
 $clickTotal = 0.0;
@@ -112,27 +113,45 @@ foreach ($stockOnHand as &$stock) {
 }
 unset($stock);
 
+$dailyRevenue = fetchAll($pdo, 'SELECT s.sale_date AS day, SUM(si.total) AS revenue, SUM(si.quantity) AS units
+    FROM sales s
+    JOIN sale_items si ON si.sale_id = s.id
+    WHERE s.sale_date BETWEEN ? AND ?
+    GROUP BY s.sale_date
+    ORDER BY s.sale_date', [$start, $end]);
+
+$peakDay = null;
+foreach ($dailyRevenue as $row) {
+    if ($peakDay === null || $row['revenue'] > $peakDay['revenue']) {
+        $peakDay = $row;
+    }
+}
+
+$largestSale = fetchOne($pdo, 'SELECT s.id, s.total_amount, s.sale_date FROM sales s WHERE s.sale_date BETWEEN ? AND ? ORDER BY s.total_amount DESC LIMIT 1', [$start, $end]);
+$collectionGap = max(0, $revenue - $totalCollected);
+$recentTrend = array_slice($dailyRevenue, -7);
+
 render_header('Hisobotlar');
 ?>
 <div class="space-y-8">
-    <section class="rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-8 shadow-xl">
+    <section class="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <p class="text-xs uppercase tracking-[0.4em] text-white/60">Filtr</p>
-                <h2 class="text-3xl font-semibold">Davr bo'yicha hisobot</h2>
-                <p class="text-sm text-white/70">Sana oralig'ini o'zgartiring va pastda moliyaviy ko'rsatkichlarni ko'ring.</p>
+                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Davr tanlash</p>
+                <h2 class="text-3xl font-semibold text-slate-900">Moliyaviy ko'rsatkichlar paneli</h2>
+                <p class="text-sm text-slate-500">Sana oralig'ini moslashtiring va savdo, foyda hamda qarzdorlikni bir ko'rinishda kuzating.</p>
             </div>
-            <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white/10 rounded-2xl p-4 text-sm">
+            <form method="get" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 rounded-2xl p-4 text-sm border border-slate-100">
                 <label class="space-y-1">
-                    <span class="text-white/70">Boshlanish</span>
-                    <input type="date" name="start" value="<?= htmlspecialchars($start) ?>" class="w-full rounded-xl border border-white/20 bg-white/90 px-3 py-2 text-slate-900 focus:border-brand-400 focus:ring-brand-200">
+                    <span class="text-slate-500">Boshlanish</span>
+                    <input type="date" name="start" value="<?= htmlspecialchars($start) ?>" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-brand-400 focus:ring-brand-200">
                 </label>
                 <label class="space-y-1">
-                    <span class="text-white/70">Tugash</span>
-                    <input type="date" name="end" value="<?= htmlspecialchars($end) ?>" class="w-full rounded-xl border border-white/20 bg-white/90 px-3 py-2 text-slate-900 focus:border-brand-400 focus:ring-brand-200">
+                    <span class="text-slate-500">Tugash</span>
+                    <input type="date" name="end" value="<?= htmlspecialchars($end) ?>" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-brand-400 focus:ring-brand-200">
                 </label>
-                <button type="submit" class="w-full rounded-xl bg-white text-slate-900 font-semibold px-4 py-2 mt-auto">Yangilash</button>
-                <a href="reports.php" class="w-full rounded-xl border border-white/40 text-center px-4 py-2 text-white/90 mt-auto">Tozalash</a>
+                <button type="submit" class="w-full rounded-xl bg-brand-600 text-white font-semibold px-4 py-2 mt-auto">Yangilash</button>
+                <a href="reports.php" class="w-full rounded-xl border border-slate-200 text-center px-4 py-2 text-slate-600 mt-auto">Tozalash</a>
             </form>
         </div>
     </section>
@@ -169,12 +188,34 @@ render_header('Hisobotlar');
                 <p class="mt-2 text-3xl font-semibold text-slate-900"><?= number_format($purchasesTotal, 2) ?> so'm</p>
                 <p class="text-xs text-slate-500 mt-1">Omborga kiritilgan tovarlar.</p>
             </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5">
+                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Birlik / savdo</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900"><?= number_format($unitsPerSale, 2) ?></p>
+                <p class="text-xs text-slate-500 mt-1">Har bir chekda sotilgan o'rtacha birlik soni.</p>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5">
+                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Eng katta chek</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900"><?= $largestSale ? number_format($largestSale['total_amount'], 2) . " so'm" : "Ma'lumot yo'q" ?></p>
+                <p class="text-xs text-slate-500 mt-1">
+                    <?php if ($largestSale): ?>
+                        #<?= (int)$largestSale['id'] ?> · <?= htmlspecialchars($largestSale['sale_date']) ?>
+                    <?php else: ?>
+                        Ushbu davrda chek yo'q.
+                    <?php endif; ?>
+                </p>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-5">
+                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Eng faol kun</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900"><?= $peakDay ? number_format($peakDay['revenue'], 2) . " so'm" : "Ma'lumot yo'q" ?></p>
+                <p class="text-xs text-slate-500 mt-1"><?= $peakDay ? htmlspecialchars($peakDay['day']) : 'Kunlik ma\'lumot topilmadi.' ?></p>
+            </article>
         </div>
         <div class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
             <div>
                 <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Qarzdorlik</p>
                 <p class="text-3xl font-semibold text-rose-600"><?= number_format($outstanding, 2) ?> so'm</p>
                 <p class="text-xs text-slate-500">Tushumga nisbatan <?= number_format($debtPercent, 1) ?>%.</p>
+                <p class="text-xs text-amber-600 mt-1">Inkassa farqi: <?= number_format($collectionGap, 2) ?> so'm.</p>
             </div>
             <div class="border-t border-slate-100 pt-4">
                 <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Ombor qiymati</p>
@@ -247,6 +288,42 @@ render_header('Hisobotlar');
         </section>
     </div>
 
+    <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-semibold text-slate-900">Kunlik tushum trendi</h3>
+                <p class="text-sm text-slate-500">So'nggi 7 kunlik natijalar (<?= htmlspecialchars($start) ?> — <?= htmlspecialchars($end) ?>).</p>
+            </div>
+            <?php if ($peakDay): ?>
+                <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1 text-xs font-semibold text-emerald-600">
+                    Eng yuqori kun: <?= htmlspecialchars($peakDay['day']) ?>
+                </span>
+            <?php endif; ?>
+        </div>
+        <?php if (empty($recentTrend)): ?>
+            <p class="text-sm text-slate-400">Ushbu davr uchun kunlik savdolar topilmadi.</p>
+        <?php else: ?>
+            <ul class="space-y-3">
+                <?php foreach ($recentTrend as $row): ?>
+                    <?php
+                        $percentage = ($peakDay && $peakDay['revenue'] > 0)
+                            ? min(100, ($row['revenue'] / $peakDay['revenue']) * 100)
+                            : 0;
+                    ?>
+                    <li>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="font-medium text-slate-700"><?= htmlspecialchars($row['day']) ?></span>
+                            <span class="text-slate-500"><?= number_format($row['revenue'], 2) ?> so'm</span>
+                        </div>
+                        <div class="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
+                            <div class="h-2 rounded-full bg-brand-400" style="width: <?= $percentage ?>%"></div>
+                        </div>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </section>
+
     <section class="rounded-3xl border border-slate-200 bg-white p-6">
         <h3 class="text-lg font-semibold text-slate-900">Eng yaxshi mahsulotlar</h3>
         <p class="text-sm text-slate-500 mb-4">Tushum bo'yicha tartiblangan.</p>
@@ -309,9 +386,6 @@ render_header('Hisobotlar');
         </div>
     </section>
 </div>
-<?php
-render_footer();
-?>
 <?php
 render_footer();
 ?>
