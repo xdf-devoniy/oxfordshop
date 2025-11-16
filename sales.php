@@ -405,18 +405,19 @@ render_header('Savdolar');
     </div>
 </div>
 
-<div id="sale-modal" class="fixed inset-0 z-40 <?= $shouldOpenSaleModal ? '' : 'hidden' ?> bg-slate-900/40 backdrop-blur-sm px-4 py-8 flex items-start justify-center" data-open-initial="<?= $shouldOpenSaleModal ? '1' : '0' ?>">
-    <div class="relative w-full max-w-6xl bg-white rounded-[32px] shadow-2xl flex flex-col max-h-[92vh]">
-        <div class="flex items-center justify-between border-b border-slate-200 px-8 py-6">
-            <div>
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Yangi savdo</p>
-                <h3 class="text-2xl font-semibold text-slate-900">Interaktiv modal oynasi</h3>
+<div id="sale-modal" class="fixed inset-0 z-40 <?= $shouldOpenSaleModal ? '' : 'hidden' ?> bg-slate-900/40 backdrop-blur-sm overflow-y-auto" data-open-initial="<?= $shouldOpenSaleModal ? '1' : '0' ?>">
+    <div class="mx-auto flex min-h-full w-full max-w-screen-2xl flex-col px-0 py-0 md:px-6 md:py-6">
+        <div class="relative flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl md:rounded-[32px]">
+            <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4 sm:px-8 sm:py-6">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Yangi savdo</p>
+                    <h3 class="text-2xl font-semibold text-slate-900">Interaktiv modal oynasi</h3>
+                </div>
+                <button type="button" class="h-11 w-11 rounded-2xl border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center" id="close-sale-modal">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
             </div>
-            <button type="button" class="h-11 w-11 rounded-2xl border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center" id="close-sale-modal">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-        </div>
-        <div class="flex-1 overflow-y-auto px-8 py-6">
+            <div class="flex-1 overflow-y-auto px-6 py-6 sm:px-8">
             <?php if (!empty($errors)): ?>
                 <div class="rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 px-5 py-4 mb-5 text-sm">
                     <ul class="list-disc space-y-1 pl-4">
@@ -449,7 +450,7 @@ render_header('Savdolar');
                                         </span>
                                     </div>
                                 </div>
-                                <div class="mt-4 max-h-[360px] overflow-y-auto pr-1">
+                                <div class="mt-4 max-h-[460px] overflow-y-auto pr-1 lg:max-h-[620px]">
                                     <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                         <?php foreach ($products as $product): ?>
                                             <?php
@@ -460,25 +461,31 @@ render_header('Savdolar');
                                                     ? mb_strtolower($product['name'])
                                                     : strtolower($product['name']);
                                             ?>
-                                            <div class="group rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-brand-300 <?= $disabled ? 'opacity-40 pointer-events-none' : '' ?>"
+                                            <div class="group flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-brand-300 <?= $disabled ? 'opacity-40 pointer-events-none' : '' ?>"
                                                  data-product-card
                                                  data-product-id="<?= (int)$product['id'] ?>"
                                                  data-product-name="<?= htmlspecialchars($searchName) ?>"
                                                  data-product-stock="<?= htmlspecialchars(number_format($stock, 2, '.', '')) ?>">
-                                                <div class="flex items-start justify-between gap-2">
-                                                    <div>
-                                                        <p class="font-semibold text-slate-900 truncate" title="<?= htmlspecialchars($product['name']) ?>"><?= htmlspecialchars($product['name']) ?></p>
-                                                        <p class="text-xs text-slate-400 mt-1"><?= htmlspecialchars($product['unit']) ?></p>
+                                                <div class="space-y-3">
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <div class="space-y-1">
+                                                            <p class="font-semibold text-slate-900 leading-snug break-words" title="<?= htmlspecialchars($product['name']) ?>"><?= htmlspecialchars($product['name']) ?></p>
+                                                            <p class="text-xs text-slate-400"><?= htmlspecialchars($product['unit']) ?></p>
+                                                        </div>
+                                                        <div class="text-right text-sm font-semibold text-brand-600 whitespace-nowrap"><?= number_format($price, 0, '.', ' ') ?> so'm</div>
                                                     </div>
-                                                    <div class="text-right text-sm font-semibold text-brand-600"><?= number_format($price, 0, '.', ' ') ?> so'm</div>
+                                                    <div class="flex items-center justify-between text-xs text-slate-500">
+                                                        <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1 font-medium">Ombor: <?= number_format($stock, 2) ?></span>
+                                                        <span class="font-mono">ID: #<?= (int)$product['id'] ?></span>
+                                                    </div>
                                                 </div>
-                                                <div class="mt-4 flex items-center justify-between gap-3">
-                                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">Ombor: <?= number_format($stock, 2) ?></span>
+                                                <div class="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
                                                     <div class="flex items-center gap-2">
                                                         <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="minus">−</button>
-                                                        <span class="w-8 text-center font-semibold text-slate-900" data-product-qty>0</span>
+                                                        <span class="w-10 text-center font-semibold text-slate-900" data-product-qty>0</span>
                                                         <button type="button" class="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100" data-action="plus">+</button>
                                                     </div>
+                                                    <span class="text-xs text-slate-400">Chekga qo'shish</span>
                                                 </div>
                                             </div>
                                         <?php endforeach; ?>
@@ -565,6 +572,7 @@ render_header('Savdolar');
                     </div>
                 </form>
             <?php endif; ?>
+        </div>
         </div>
     </div>
 </div>

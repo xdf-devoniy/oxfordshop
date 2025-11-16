@@ -20,6 +20,7 @@ if ($startDate > $endDate) {
 
 $start = $startDate->format('Y-m-d');
 $end = $endDate->format('Y-m-d');
+$periodDays = max(1, $startDate->diff($endDate)->days + 1);
 
 $purchasesTotal = fetchOne($pdo, 'SELECT IFNULL(SUM(quantity * unit_cost),0) AS total
     FROM purchases
@@ -82,6 +83,10 @@ $salesByProduct = fetchAll($pdo, 'SELECT si.product_id, p.name, p.unit,
     WHERE s.sale_date BETWEEN ? AND ?
     GROUP BY si.product_id, p.name, p.unit
     ORDER BY revenue DESC', [$start, $end]);
+$salesByProductMap = [];
+foreach ($salesByProduct as $row) {
+    $salesByProductMap[(int)$row['product_id']] = $row;
+}
 
 $cogs = 0;
 foreach ($salesByProduct as $row) {
@@ -112,6 +117,71 @@ foreach ($stockOnHand as &$stock) {
     $inventoryValue += $value;
 }
 unset($stock);
+
+$lastPurchaseRows = fetchAll($pdo, 'SELECT product_id, MAX(purchase_date) AS last_date FROM purchases GROUP BY product_id');
+$lastPurchaseLookup = [];
+foreach ($lastPurchaseRows as $row) {
+    $lastPurchaseLookup[(int)$row['product_id']] = $row['last_date'];
+}
+
+$reorderInsights = [];
+$statusOrder = ['out' => 0, 'critical' => 1, 'soon' => 2, 'plan' => 3];
+foreach ($stockOnHand as $stock) {
+    $productId = (int)$stock['id'];
+    $stockQty = (float)$stock['stock'];
+    $soldQty = isset($salesByProductMap[$productId]) ? (float)$salesByProductMap[$productId]['quantity'] : 0.0;
+    $avgDaily = $soldQty > 0 ? $soldQty / $periodDays : 0.0;
+    $coverageDays = $avgDaily > 0 ? ($stockQty / $avgDaily) : null;
+    $status = null;
+    $recommended = null;
+
+    if ($avgDaily <= 0) {
+        if ($stockQty <= 0) {
+            $status = 'out';
+        }
+    } else {
+        $targetDays = 14;
+        $targetStock = $avgDaily * $targetDays;
+        $recommended = max(0, $targetStock - $stockQty);
+
+        if ($stockQty <= 0 || ($coverageDays !== null && $coverageDays < 1)) {
+            $status = 'out';
+        } elseif ($coverageDays !== null && $coverageDays <= 3) {
+            $status = 'critical';
+        } elseif ($coverageDays !== null && $coverageDays <= 7) {
+            $status = 'soon';
+        } elseif ($coverageDays !== null && $coverageDays <= 14) {
+            $status = 'plan';
+        }
+    }
+
+    if ($status === null) {
+        continue;
+    }
+
+    $reorderInsights[] = [
+        'id' => $productId,
+        'name' => $stock['name'],
+        'unit' => $stock['unit'],
+        'stock' => $stockQty,
+        'avg_daily' => $avgDaily,
+        'coverage' => $coverageDays,
+        'recommended' => $recommended,
+        'status' => $status,
+        'last_purchase' => $lastPurchaseLookup[$productId] ?? null,
+    ];
+}
+
+usort($reorderInsights, function ($a, $b) use ($statusOrder) {
+    $weightA = $statusOrder[$a['status']] ?? 99;
+    $weightB = $statusOrder[$b['status']] ?? 99;
+    if ($weightA === $weightB) {
+        $coverA = $a['coverage'] ?? INF;
+        $coverB = $b['coverage'] ?? INF;
+        return $coverA <=> $coverB;
+    }
+    return $weightA <=> $weightB;
+});
 
 $dailyRevenue = fetchAll($pdo, 'SELECT s.sale_date AS day, SUM(si.total) AS revenue, SUM(si.quantity) AS units
     FROM sales s
@@ -321,6 +391,70 @@ render_header('Hisobotlar');
                     </li>
                 <?php endforeach; ?>
             </ul>
+        <?php endif; ?>
+    </section>
+
+    <section class="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
+        <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Xarid qilish kerak</p>
+                <h3 class="text-2xl font-semibold text-slate-900">Omborni to'ldirish bo'yicha tavsiyalar</h3>
+                <p class="text-sm text-slate-500">Analiz <?= $periodDays ?> kunlik savdo va qoldiq ma'lumotlariga asoslanadi.</p>
+            </div>
+            <div class="text-xs text-slate-500">
+                Maqsad — har bir pozitsiya uchun kamida 14 kunlik zaxira.
+            </div>
+        </div>
+        <?php if (empty($reorderInsights)): ?>
+            <p class="text-sm text-slate-500">Hozircha zudlik bilan xarid qilish zarurati yo'q. Qoldiqlar prognoz qilingan talabni qoplaydi.</p>
+        <?php else: ?>
+            <?php $statusBadges = [
+                'out' => ['label' => "Zudlik bilan", 'class' => 'bg-rose-50 text-rose-600'],
+                'critical' => ['label' => "3 kun ichida", 'class' => 'bg-amber-50 text-amber-700'],
+                'soon' => ['label' => "7 kun ichida", 'class' => 'bg-sky-50 text-sky-600'],
+                'plan' => ['label' => "Rejalashtiring", 'class' => 'bg-emerald-50 text-emerald-700'],
+            ]; ?>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="text-xs uppercase text-slate-400">
+                        <tr>
+                            <th class="py-2 text-left">Mahsulot</th>
+                            <th class="py-2 text-left">Qoldiq</th>
+                            <th class="py-2 text-left">Kunlik sotuv</th>
+                            <th class="py-2 text-left">Qamrov</th>
+                            <th class="py-2 text-left">Tavsiya etilgan xarid</th>
+                            <th class="py-2 text-left">Holat</th>
+                            <th class="py-2 text-left">Oxirgi xarid</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <?php foreach ($reorderInsights as $row): ?>
+                            <?php $badge = $statusBadges[$row['status']] ?? ['label' => 'Holat', 'class' => 'bg-slate-100 text-slate-600']; ?>
+                            <tr>
+                                <td class="py-3 font-medium text-slate-900">#<?= (int)$row['id'] ?> · <?= htmlspecialchars($row['name']) ?></td>
+                                <td class="py-3 text-slate-500">
+                                    <?= number_format($row['stock'], 2) ?> <?= htmlspecialchars($row['unit']) ?>
+                                </td>
+                                <td class="py-3 text-slate-500">
+                                    <?= $row['avg_daily'] > 0 ? number_format($row['avg_daily'], 2) . ' ' . htmlspecialchars($row['unit']) . '/kun' : '—' ?>
+                                </td>
+                                <td class="py-3 text-slate-500">
+                                    <?= $row['coverage'] !== null ? number_format($row['coverage'], 1) . ' kun' : 'Ma\'lumot yo\'q' ?>
+                                </td>
+                                <td class="py-3 text-slate-900">
+                                    <?= $row['recommended'] !== null ? number_format($row['recommended'], 2) . ' ' . htmlspecialchars($row['unit']) : '—' ?>
+                                </td>
+                                <td class="py-3">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold <?= $badge['class'] ?>"><?= $badge['label'] ?></span>
+                                </td>
+                                <td class="py-3 text-slate-500">
+                                    <?= !empty($row['last_purchase']) ? htmlspecialchars($row['last_purchase']) : "Ma'lumot yo'q" ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php endif; ?>
     </section>
 
