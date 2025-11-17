@@ -317,11 +317,11 @@ if ($showWorkspace) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     </head>
-    <body class="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 font-display text-slate-900">
-        <div class="min-h-screen flex flex-col">
-            <main class="flex-1">
-                <div class="mx-auto w-full max-w-7xl px-4 lg:px-8 py-6 space-y-6">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
+    <body class="h-screen overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 font-display text-slate-900">
+        <div class="flex h-screen flex-col">
+            <main class="flex-1 overflow-hidden">
+                <div class="mx-auto flex h-full w-full max-w-none flex-col gap-4 px-4 py-4 lg:px-8">
+                    <div class="flex flex-wrap items-center justify-between gap-4 shrink-0">
                         <a href="sales.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                             &larr; Savdolar ro'yxati
                         </a>
@@ -333,7 +333,7 @@ if ($showWorkspace) {
                     </div>
 
                     <?php if (!empty($errors)): ?>
-                        <div class="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+                        <div class="shrink-0 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
                             <ul class="list-disc pl-4 space-y-1">
                                 <?php foreach ($errors as $error): ?>
                                     <li><?= htmlspecialchars($error) ?></li>
@@ -347,11 +347,13 @@ if ($showWorkspace) {
                             Avval mahsulot qo'shing. <a href="products.php" class="text-brand-600 font-semibold">Mahsulotlar</a> sahifasiga o'ting.
                         </div>
                     <?php else: ?>
-                        <form method="post" class="space-y-6" id="sale-form">
+                        <form method="post" class="flex-1 overflow-hidden" id="sale-form">
                             <input type="hidden" name="cart_payload" id="cart-payload" value='<?= htmlspecialchars($cartJson, ENT_QUOTES, 'UTF-8') ?>'>
-                            <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr),minmax(360px,1fr)]">
-                                <section class="space-y-6">
-                                    <div class="rounded-3xl border border-slate-200 bg-white/80 p-5">
+                            <input type="hidden" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>">
+                            <input type="hidden" name="notes" value="<?= htmlspecialchars($notes) ?>">
+                            <div class="grid h-full gap-6 overflow-hidden lg:grid-cols-[minmax(0,2fr),minmax(360px,1fr)]">
+                                <section class="flex h-full flex-col overflow-hidden">
+                                    <div class="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/80 p-5">
                                         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                             <div>
                                                 <h2 class="text-lg font-semibold">Mahsulot katalogi</h2>
@@ -364,12 +366,13 @@ if ($showWorkspace) {
                                                 </span>
                                             </div>
                                         </div>
-                                        <div class="mt-4 max-h-[65vh] overflow-y-auto pr-1">
-                                            <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                                                <?php foreach ($products as $product): ?>
-                                                    <?php
-                                                        $price = (float)$product['default_price'];
-                                                        $stock = (float)($stockLevels[$product['id']] ?? 0);
+                                        <div class="mt-4 flex-1 overflow-hidden">
+                                            <div class="h-full overflow-y-auto pr-1">
+                                                <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                                                    <?php foreach ($products as $product): ?>
+                                                        <?php
+                                                            $price = (float)$product['default_price'];
+                                                            $stock = (float)($stockLevels[$product['id']] ?? 0);
                                                         $disabled = $stock <= 0 || $price <= 0;
                                                         $searchName = function_exists('mb_strtolower')
                                                             ? mb_strtolower($product['name'])
@@ -406,12 +409,13 @@ if ($showWorkspace) {
                                                     </div>
                                                 <?php endforeach; ?>
                                             </div>
+                                            </div>
                                             <p id="product-empty" class="hidden py-6 text-center text-sm text-slate-400">Natija topilmadi.</p>
                                         </div>
                                     </div>
                                 </section>
-                                <aside class="space-y-6 lg:sticky lg:top-8 self-start">
-                                    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <aside class="flex h-full flex-col gap-6">
+                                    <div class="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm overflow-hidden">
                                         <div class="flex items-center justify-between">
                                             <div>
                                                 <h3 class="text-lg font-semibold">Tanlangan mahsulotlar</h3>
@@ -422,29 +426,15 @@ if ($showWorkspace) {
                                         <div id="cart-empty" class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center text-sm text-slate-500">
                                             Savatga hech narsa qo'shilmadi.
                                         </div>
-                                        <div id="cart-items" class="mt-4 space-y-3"></div>
-                                        <div class="mt-6 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                        <div id="cart-items" class="mt-4 flex-1 space-y-3 overflow-y-auto pr-1"></div>
+                                        <div class="mt-6 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500 shrink-0">
                                             <div class="flex items-center justify-between font-semibold text-slate-900">
                                                 <span>Jami:</span>
                                                 <span id="cart-total">0</span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
-                                        <div>
-                                            <h3 class="text-lg font-semibold">Savdo tafsilotlari</h3>
-                                            <p class="text-sm text-slate-500">Sanani va qaydlarni kiriting.</p>
-                                        </div>
-                                        <label class="space-y-1 text-sm font-medium text-slate-700">
-                                            Savdo sanasi
-                                            <input type="date" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>" class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 focus:border-brand-500 focus:ring-brand-200">
-                                        </label>
-                                        <label class="space-y-1 text-sm font-medium text-slate-700">
-                                            Izoh
-                                            <textarea name="notes" rows="2" class="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 focus:border-brand-500 focus:ring-brand-200" placeholder="Istalgan qo'shimcha ma'lumot"><?= htmlspecialchars($notes) ?></textarea>
-                                        </label>
-                                    </div>
-                                    <div class="rounded-3xl border border-slate-200 bg-white p-5 space-y-4">
+                                    <div class="rounded-3xl border border-slate-200 bg-white p-5 space-y-4 shrink-0">
                                         <div>
                                             <h3 class="text-lg font-semibold">To'lov holati</h3>
                                             <p class="text-sm text-slate-500">To'lov turini tanlang.</p>
