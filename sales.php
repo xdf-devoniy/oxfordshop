@@ -317,10 +317,10 @@ if ($showWorkspace) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     </head>
-    <body class="h-screen overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 font-display text-slate-900">
-        <div class="flex h-screen flex-col">
-            <main class="flex-1 overflow-hidden">
-                <div class="mx-auto flex h-full w-full max-w-none flex-col gap-4 px-4 py-4 lg:px-8">
+    <body class="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 font-display text-slate-900">
+        <div class="flex min-h-screen flex-col">
+            <main class="flex-1">
+                <div class="mx-auto flex w-full max-w-none flex-col gap-4 px-4 py-6 lg:px-8">
                     <div class="flex flex-wrap items-center justify-between gap-4 shrink-0">
                         <a href="sales.php" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                             &larr; Savdolar ro'yxati
@@ -347,13 +347,13 @@ if ($showWorkspace) {
                             Avval mahsulot qo'shing. <a href="products.php" class="text-brand-600 font-semibold">Mahsulotlar</a> sahifasiga o'ting.
                         </div>
                     <?php else: ?>
-                        <form method="post" class="flex-1 overflow-hidden" id="sale-form">
+                        <form method="post" class="flex-1" id="sale-form">
                             <input type="hidden" name="cart_payload" id="cart-payload" value='<?= htmlspecialchars($cartJson, ENT_QUOTES, 'UTF-8') ?>'>
                             <input type="hidden" name="sale_date" value="<?= htmlspecialchars($saleDate) ?>">
                             <input type="hidden" name="notes" value="<?= htmlspecialchars($notes) ?>">
-                            <div class="grid h-full gap-6 overflow-hidden lg:grid-cols-[minmax(0,2fr),minmax(360px,1fr)]">
-                                <section class="flex h-full flex-col overflow-hidden">
-                                    <div class="flex h-full flex-col rounded-3xl border border-slate-200 bg-white/80 p-5">
+                            <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr),minmax(360px,1fr)]">
+                                <section class="flex flex-col">
+                                    <div class="flex flex-col rounded-3xl border border-slate-200 bg-white/80 p-5 lg:min-h-[70vh]">
                                         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                             <div>
                                                 <h2 class="text-lg font-semibold">Mahsulot katalogi</h2>
@@ -414,8 +414,8 @@ if ($showWorkspace) {
                                         </div>
                                     </div>
                                 </section>
-                                <aside class="flex h-full flex-col gap-6">
-                                    <div class="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm overflow-hidden">
+                                <aside class="flex flex-col gap-6 lg:min-h-[70vh]">
+                                    <div class="flex flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm overflow-hidden lg:max-h-[70vh]">
                                         <div class="flex items-center justify-between">
                                             <div>
                                                 <h3 class="text-lg font-semibold">Tanlangan mahsulotlar</h3>
